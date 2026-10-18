@@ -2,8 +2,9 @@
 -- usergroups with no admin mod) all decide who may use gKnuckle's admin powers.
 -- With no admin mod, CAMI's fallback uses each privilege's MinAccess below.
 -- Above all of that sits the owner tier and Omerta's access roles (checked first):
---   gk_owner_steamids  comma-separated SteamID64s with every gKnuckle privilege
---                      (default: mobs2r, 76561199041513241)
+--   gk_owner_steamids  comma-separated SteamID64s with every gKnuckle privilege.
+--                      Empty by default (N3): each server sets its own in server.cfg
+--                      (see server.cfg.example; Illicit's servers use 76561199041513241).
 --   GET /api/private/access-role/<steamid64> (Omerta, planned) -> { role = "owner"|"admin"|"moderator"|null }
 --     owner: everything; admin: every MinAccess "admin" privilege; moderator: ROLE_MOD below.
 --     Signed (sv_apiauth.lua) on the pinned economy origin, cached 5 min. Any failure
@@ -46,7 +47,7 @@ local function roleGrants(role, priv)
 end
 
 if SERVER then
-    local cvOwners = CreateConVar("gk_owner_steamids", "76561199041513241", { FCVAR_ARCHIVE, FCVAR_PROTECTED },
+    local cvOwners = CreateConVar("gk_owner_steamids", "", { FCVAR_ARCHIVE, FCVAR_PROTECTED },
         "SteamID64s (comma-separated) with full gKnuckle owner access")
     local cvRoles = CreateConVar("gk_access_roles", "1", { FCVAR_ARCHIVE }, "Ask Omerta /api/private/access-role for owner/admin/moderator roles")
     local owners, ownersRaw = {}, nil
@@ -58,6 +59,14 @@ if SERVER then
         end
         return owners[sid] == true
     end
+    -- Say who the owners are once the config has run, so nobody has hidden access.
+    timer.Simple(0, function()
+        local list = {}
+        GK.IsOwnerSteamID("")
+        for s in pairs(owners) do list[#list + 1] = s end
+        table.sort(list)
+        print(("[gKnuckle] owner tier (gk_owner_steamids): %s"):format(#list > 0 and table.concat(list, ", ") or "none"))
+    end)
 
     local roleCache = {} -- sid -> { role, expires }
     local ROLES = { owner = true, admin = true, moderator = true }
@@ -82,6 +91,7 @@ if SERVER then
                 end, "access-role")
             end
         end
+        if not (ply:IsFullyAuthenticated() or game.SinglePlayer()) then return nil end -- N7: verified SteamIDs only
         return c and c.expires > CurTime() and c.role or nil
     end
     hook.Add("PlayerAuthed", "GK_AccessRole", function(ply)

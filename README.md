@@ -31,9 +31,22 @@ addon.json                  gmad/gmpublisher descriptor
 
 ## Configuration
 
-The economy bridge (`sv_economy.lua`, `sv_backpack.lua`) reads its secret from a server convar. Never commit it:
+All settings are server convars. Put them in `cfg/server.cfg` and never commit the keys. `server.cfg.example` lists every setting.
 
+**Owner (full gKnuckle admin).** This is empty by default, so nobody gets owner access unless the server sets it. Illicit's own servers use:
 ```
-gk_economy_api "https://illicit.up.railway.app"
-gk_economy_key "<API_SECRET>"     // set in server.cfg only
+gk_owner_steamids "76561199041513241"   // mobs2r; comma-separate more
 ```
+The server prints the configured owners at startup.
+
+**Omerta access roles.** Owner, admin and moderator roles also come from Omerta (`gk_access_roles 1`), but only with a per-server key.
+
+**Economy / backpack (CrabCoin).** These need either:
+- a per-server key in the form `gk_economy_key "<id>:<secret>"` (only the id is sent; requests are HMAC-signed), or
+- **until the API ships per-server keys**, the legacy global secret **plus** `gk_economy_legacy_key 1`.
+
+Without one of those, **the economy is off**, and the server console says so in red. The legacy secret can mint unlimited CrabCoin. Switch to a per-server key as soon as one exists.
+
+**Bans.** `gk_bans_failmode` decides what happens when the ban API can't answer:
+- `open` (the default): players are let in, so globally banned players can join during an API outage.
+- `closed`: every first-time connect is refused until the ban cache warms up.
