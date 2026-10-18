@@ -69,6 +69,7 @@ AddCSLuaFile("cl_mirror.lua")
 
 include("shared.lua")
 include("sv_economy.lua")
+include("sv_sandbox_guard.lua")
 include("sv_explode.lua")
 include("sv_inventory.lua")
 include("sv_ragdoll.lua")
@@ -144,7 +145,7 @@ end
 function GM:PlayerLoadout(ply)
     ply:StripWeapons()
     ply:Give(GK.Weapons.Mind)
-    if cvTools:GetBool() then
+    if cvTools:GetBool() and GK.SandboxGuard.Allowed(ply) then
         ply:Give("weapon_physgun")
         ply:Give("gmod_tool")
     end
