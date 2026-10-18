@@ -37,7 +37,7 @@ local SEND_GAP, QUEUE_MAX = 3.0, 10      -- Omerta's bot cap is 20/min and 400/d
 local BOT_PER_MIN, BOT_PER_DAY = 18, 380 -- stay under it so a busy server degrades politely
 
 local C = { cursor = 0, primed = false, number = nil, seen = {}, seenOrder = {}, queue = {},
-    inflight = false, inflightAt = 0, nextPoll = 0, fails = 0, lastSend = 0, warned = {}, sent = {}, recent = {}, day = { d = os.date("%Y%m%d"), n = 0 } }
+    inflight = false, inflightAt = 0, nextPoll = 0, fails = 0, lastSend = 0, warned = {}, sent = {}, recent = {}, muted = {}, day = { d = os.date("%Y%m%d"), n = 0 } }
 GKCommunity.state = C
 
 local function origin() return GK.ApiAuth.Origin(cvApi:GetString()) end
@@ -230,6 +230,7 @@ hook.Add("player_say", "GK_CommunityRelay", function(d)
     if string.find(string.lower(text), "https?://") or string.find(string.lower(text), "www%.") then
         return tell(ply, "links stay in-game (gk.style chat doesn't take them)")
     end
+    if (C.muted[ply:SteamID64()] or 0) > os.time() then return end -- muted on the relay by a moderator
     if not userAllowed(ply) then return tell(ply, "slow down: that line stayed in-game") end
     -- Mentions need a room permission the relay doesn't ask for; defuse them.
     text = string.gsub(text, "@(%a)", "@\226\128\139%1")
@@ -266,6 +267,21 @@ end)
 for _, n in ipairs({ "gk_community_api", "gk_community_channel", "gk_community_bot_token" }) do
     cvars.AddChangeCallback(n, function() C.primed, C.cursor, C.fails = false, 0, 0 end, "GK_Community")
 end
+
+-- Moderators: keep a player's lines off gk.style for N minutes (default 60; in-game chat is untouched).
+concommand.Add("gk_community_mute", function(ply, _, args)
+    if not GK.RequireAccess(ply, "gknuckle.moderate") then return end
+    local target = GK.Bans and GK.Bans.FindTarget(args[1])
+    if not IsValid(target) then return end
+    local minutes = math.Clamp(math.floor(tonumber(args[2]) or 60), 1, 10080)
+    C.muted[target:SteamID64()] = os.time() + minutes * 60
+    print(("[COMMUNiTY] %s muted %s on the relay for %d min"):format(IsValid(ply) and ply:Nick() or "console", target:Nick(), minutes))
+end)
+concommand.Add("gk_community_unmute", function(ply, _, args)
+    if not GK.RequireAccess(ply, "gknuckle.moderate") then return end
+    local target = GK.Bans and GK.Bans.FindTarget(args[1])
+    if IsValid(target) then C.muted[target:SteamID64()] = nil end
+end)
 
 concommand.Add("gk_community_status", function(ply)
     if not GK.RequireAccess(ply, "gknuckle.community_admin") then return end

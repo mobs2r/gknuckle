@@ -164,8 +164,34 @@ hook.Add("SAM.UnbannedSteamID", "GK_BansReport", function(steamid, adminSid)
     B.Report("unban", steamid, 0, "", adminSid, "sam")
 end)
 
+-- Find one player by SteamID64, SteamID or a unique part of their name.
+function B.FindTarget(q)
+    q = string.lower(string.Trim(tostring(q or "")))
+    if q == "" then return nil end
+    local hit
+    for _, p in ipairs(player.GetHumans()) do
+        if p:SteamID64() == q or string.lower(p:SteamID()) == q then return p end
+        if string.find(string.lower(p:Nick()), q, 1, true) then
+            if hit then return nil end -- ambiguous
+            hit = p
+        end
+    end
+    return hit
+end
+
+-- Moderators (Omerta role or gknuckle.moderate): kick with a reason. Can't kick the owner.
+concommand.Add("gk_mod_kick", function(ply, _, args)
+    if not GK.RequireAccess(ply, "gknuckle.moderate") then return end
+    local target = B.FindTarget(args[1])
+    if not IsValid(target) then if IsValid(ply) then ply:PrintMessage(HUD_PRINTCONSOLE, "[gKnuckle] no single player matches") end return end
+    if GK.IsOwnerSteamID and GK.IsOwnerSteamID(target:SteamID64()) then return end
+    local reason = string.sub(table.concat(args, " ", 2), 1, 120)
+    print(("[gKnuckle] %s kicked %s (%s): %s"):format(IsValid(ply) and ply:Nick() or "console", target:Nick(), target:SteamID64(), reason))
+    target:Kick(reason ~= "" and reason or "Kicked by a moderator")
+end)
+
 concommand.Add("gk_bans_status", function(ply)
-    if not GK.RequireAccess(ply, "gknuckle.bans_admin") then return end
+    if not GK.RequireAccess(ply, "gknuckle.bans_view") then return end
     local n = 0 for _ in pairs(cache) do n = n + 1 end
     local msg = ("[gKnuckle] bans %s, failmode %s, cached %d, outbox %d"):format(enabled() and "on" or "off", cvFail:GetString(), n, #outbox)
     if IsValid(ply) then ply:PrintMessage(HUD_PRINTCONSOLE, msg) else print(msg) end
