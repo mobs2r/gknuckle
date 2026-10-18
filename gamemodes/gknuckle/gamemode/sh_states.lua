@@ -85,7 +85,9 @@ end
 if SERVER then
     util.AddNetworkString("gk_menu")
     net.Receive("gk_menu", function(_, ply)
-        ply:SetNW2Bool("gk_in_menu", net.ReadBool())
+        local open = net.ReadBool()
+        -- Only touch the networked var on a real change, so spamming the message costs nothing.
+        if ply:GetNW2Bool("gk_in_menu", false) ~= open then ply:SetNW2Bool("gk_in_menu", open) end
     end)
 else
     local last = false

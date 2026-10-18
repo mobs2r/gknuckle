@@ -15,8 +15,18 @@ local function enabled()
     return cvKey:GetString() ~= ""
 end
 
+-- The API key travels in a header: only ever send it over HTTPS.
+local function secureOrigin(url)
+    return string.StartWith(string.lower(url or ""), "https://")
+end
+
 local function request(method, path, body, onDone)
     if not enabled() then return end
+    if not secureOrigin(cvApi:GetString()) then
+        print("[gKnuckle] economy API origin must start with https://; request skipped")
+        if onDone then onDone(false, {}) end
+        return
+    end
     HTTP({
         url = cvApi:GetString() .. path,
         method = method,
