@@ -1,3 +1,5 @@
+-- Mount a cached playable-pack before anything else creates materials.
+include("cl_pack.lua")
 include("shared.lua")
 include("cl_hands.lua")
 include("cl_hud.lua")

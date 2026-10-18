@@ -85,6 +85,10 @@ local function drawsHand(ply, side) return true end
 -- Items WK doesn't have (the HL2 ones) float their 3D model in the palm instead
 -- (cl_inventory.lua, drawn after the hands so it isn't hidden behind them).
 local HELD = util.JSONToTable(file.Read("data_static/gknuckle/held.json", "GAME") or "") or {}
+-- held.json is in playable-pack: read it again once the pack mounts mid-session.
+hook.Add("GK_PackMounted", "GK_HandsHeld", function()
+    HELD = util.JSONToTable(file.Read("data_static/gknuckle/held.json", "GAME") or "") or {}
+end)
 
 -- Items WK has no hand sprite for (the HL2 crowbar, battery, health vial...):
 -- their model is rendered once into a small transparent texture and held like
