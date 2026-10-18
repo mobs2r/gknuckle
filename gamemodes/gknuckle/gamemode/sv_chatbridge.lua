@@ -2,7 +2,9 @@
 -- Each game server is its own Omerta bot (crabcoin-api PR #180 bot desk, "omb_" token),
 -- installed in the room with read + send permissions. API_SPEC.md §6.
 --   in:  POST {api}/api/bots/v1/channels/<channel>/messages   Authorization: Bot <token>
---        { body = "<player>: <text>" } -> 201 { id }
+--        { body = "<text>", relayed_for = { steam_id = "<steamid64>", name = "<nick>" } } -> 201 { id }
+--        (N4: the player is structured data, never "Nick: text", so Omerta can render
+--        "<name> via <bot>" and nobody can pose as someone else with a crafted nick)
 --   out: GET  {api}/api/bots/v1/channels/<channel>/messages?limit=50[&after=<id>]
 --        -> { messages = [ { id, authorId, body, createdAt[, author = { name, isBot }] } ] }
 --        polled every ~2 s: game servers can't take Omerta's signed webhooks.
@@ -15,8 +17,13 @@
 -- Empty api or token = bridge off.
 
 if GKCommunity and GKCommunity.loaded and not GKCommunity.gamemode then
-    print("[COMMUNiTY] the portal's gk_community_sv.lua is already running; gamemode bridge not started")
-    return
+    -- N14: the portal's older lua/gk_community_sv.lua loaded first. Take over so only this
+    -- (hardened) bridge relays: drop its hooks and timers (names from gknuckle-portal PR #2).
+    hook.Remove("PlayerSay", "gk_community_say")
+    hook.Remove("InitPostEntity", "gk_community_socket")
+    timer.Remove("gk_community_poll")
+    timer.Remove("gk_community_socket")
+    MsgC(Color(255, 154, 31), "[COMMUNiTY] the portal's gk_community_sv.lua was loaded; it is switched off in favour of the gamemode bridge. Remove it from the server.\n")
 end
 GKCommunity = { loaded = true, gamemode = true } -- makes the portal copy step aside if it loads later
 
@@ -35,6 +42,8 @@ local MAX_BODY, MAX_NAME = 280, 32       -- Omerta takes 2000; keep game lines c
 local USER_GAP, USER_BURST = 1.5, 8      -- per player: 1.5 s apart, 8 a minute
 local SEND_GAP, QUEUE_MAX = 3.0, 10      -- Omerta's bot cap is 20/min and 400/day per bot
 local BOT_PER_MIN, BOT_PER_DAY = 18, 380 -- stay under it so a busy server degrades politely
+local USER_PER_DAY = math.floor(BOT_PER_DAY / 4) -- N12: one SteamID can't use more than 25% of the day
+local MUTES = "gknuckle/community_mutes.json"   -- N12: relay mutes survive a restart
 
 local C = { cursor = 0, primed = false, number = nil, seen = {}, seenOrder = {}, queue = {},
     inflight = false, inflightAt = 0, nextPoll = 0, fails = 0, lastSend = 0, warned = {}, sent = {}, recent = {}, muted = {}, day = { d = os.date("%Y%m%d"), n = 0 } }
@@ -61,6 +70,9 @@ local function clean(s, max)
     if utf8.force then s = utf8.force(s) end
     s = string.gsub(s, "[%z\1-\31\127]", " ")
     s = string.gsub(s, "\226\128[\168\169\170-\174]", " ") -- U+2028/2029 separators, bidi overrides
+    s = string.gsub(s, "\226\128[\139-\143]", "")          -- N11: U+200B-200F zero-width / direction marks
+    s = string.gsub(s, "\226\129[\160-\175]", "")          -- U+2060-206F word joiner, isolates (2066-2069)
+    s = string.gsub(s, "\239\187\191", "")                  -- U+FEFF
     s = string.Trim(string.gsub(s, "%s+", " "))
     if utf8.len(s) and utf8.len(s) > max then
         s = string.sub(s, 1, (utf8.offset(s, max + 1) or (#s + 1)) - 1)
@@ -70,6 +82,31 @@ local function clean(s, max)
     return s
 end
 GKCommunity.Clean = clean
+
+-- N4: a nick as a plain label: cleaned, no ':' (so "Bob: Alice" can't fake attribution).
+local function cleanName(s)
+    local n = clean(s, MAX_NAME)
+    n = string.gsub(n, ":", " ")
+    n = string.gsub(n, "\239\188\154", " ") -- U+FF1A fullwidth colon
+    n = string.Trim((string.gsub(n, "%s+", " ")))
+    return n ~= "" and n or "player"
+end
+GKCommunity.CleanName = cleanName
+
+-- N11: anything that looks like a link, not just http(s):// and www.
+local TLDS = { com = 1, net = 1, org = 1, gg = 1, io = 1, ru = 1, xyz = 1, co = 1, me = 1, tv = 1, ly = 1, link = 1,
+    app = 1, dev = 1, site = 1, club = 1, shop = 1, top = 1, info = 1, biz = 1, cc = 1, to = 1, be = 1, uk = 1, de = 1, style = 1, chat = 1 }
+local function hasLink(text)
+    local l = string.lower(text)
+    if string.find(l, "://", 1, true) or string.find(l, "www.", 1, true) or string.find(l, "hxxp", 1, true)
+        or string.find(l, "](", 1, true) or string.find(l, "//", 1, true) then return true end
+    for word in string.gmatch(l, "[^%s]+") do
+        local tld = string.match(word, "^[%w%-%.]+%.(%a%a+)[/:%?#]") or string.match(word, "^[%w%-%.]+%.(%a%a+)$")
+        if tld and TLDS[tld] then return true end
+    end
+    return false
+end
+GKCommunity.HasLink = hasLink
 
 local function remember(id)
     id = tostring(id or "")
@@ -114,7 +151,7 @@ local function show(m)
     if (C.recent[body] or 0) > CurTime() then return end
     local author = istable(m.author) and m.author or {}
     local name = clean(author.name or m.authorName or m.username, MAX_NAME)
-    local where = author.isBot and "server" or "web"
+    local where = author.isBot and "server" or "web" -- shown with a "web:"/"server:" prefix in game (N4)
     if name == "" then name = where == "web" and "web" or "server" end
     net.Start("gk_community")
     net.WriteString(where)
@@ -162,8 +199,24 @@ local function tell(ply, msg)
     if IsValid(ply) then ply:ChatPrint("[COMMUNiTY] " .. msg) end
 end
 
+local function saveMutes()
+    local keep = {}
+    for sid, untilTs in pairs(C.muted) do if untilTs > os.time() then keep[sid] = untilTs end end
+    file.CreateDir("gknuckle")
+    file.Write(MUTES, util.TableToJSON(keep))
+end
+for sid, untilTs in pairs(util.JSONToTable(file.Read(MUTES, "DATA") or "") or {}) do
+    if isstring(sid) and string.match(sid, "^7656119%d+$") and tonumber(untilTs) then C.muted[sid] = tonumber(untilTs) end
+end
+
 local function userAllowed(ply)
     local now = CurTime()
+    -- N12: per SteamID, so reconnecting doesn't reset it, and a daily share of the bot budget.
+    local sid = ply:SteamID64() or ""
+    local today = os.date("%Y%m%d")
+    if not C.userDay or C.userDay.d ~= today then C.userDay = { d = today, n = {}, hits = {} } end
+    if (C.userDay.n[sid] or 0) >= USER_PER_DAY then return false end
+    ply.GK_CommunityHits = ply.GK_CommunityHits or C.userDay.hits[sid]
     local hits = ply.GK_CommunityHits or {}
     local kept = {}
     for _, t in ipairs(hits) do if now - t < 60 then kept[#kept + 1] = t end end
@@ -173,6 +226,8 @@ local function userAllowed(ply)
     end
     kept[#kept + 1] = now
     ply.GK_CommunityHits = kept
+    C.userDay.hits[sid] = kept
+    C.userDay.n[sid] = (C.userDay.n[sid] or 0) + 1
     return true
 end
 
@@ -202,7 +257,7 @@ local function flush()
     C.minute[#C.minute + 1] = CurTime()
     C.day.n = C.day.n + 1
     C.recent[clean(item.body, 300)] = CurTime() + 60
-    request("POST", roomPath(), { body = item.body }, function(code, data)
+    request("POST", roomPath(), { body = item.body, relayed_for = item.relayed_for, kind = item.kind }, function(code, data)
         C.sending = false
         if code == 200 or code == 201 then
             if data.id ~= nil then C.sent[tostring(data.id)] = true advance(data.id) remember(data.id) end
@@ -227,21 +282,21 @@ hook.Add("player_say", "GK_CommunityRelay", function(d)
     local text = clean(d.text, MAX_BODY)
     local first = string.sub(text, 1, 1)
     if text == "" or first == "!" or first == "/" or first == "@" then return end
-    if string.find(string.lower(text), "https?://") or string.find(string.lower(text), "www%.") then
+    if hasLink(text) then
         return tell(ply, "links stay in-game (gk.style chat doesn't take them)")
     end
     if (C.muted[ply:SteamID64()] or 0) > os.time() then return end -- muted on the relay by a moderator
     if not userAllowed(ply) then return tell(ply, "slow down: that line stayed in-game") end
-    -- Mentions need a room permission the relay doesn't ask for; defuse them.
-    text = string.gsub(text, "@(%a)", "@\226\128\139%1")
-    enqueue({ ply = ply, body = clean(ply:Nick(), MAX_NAME) .. ": " .. text })
+    -- Mentions need a room permission the relay doesn't ask for; defuse every @ (N11).
+    text = string.gsub(text, "@(%S)", "@\226\128\139%1")
+    enqueue({ ply = ply, body = text, relayed_for = { steam_id = ply:SteamID64(), name = cleanName(ply:Nick()) } })
 end)
 
 -- Optional join/leave/death lines (they spend the same bot send budget) ------------
 local function event(kind, ply)
     if not enabled() or not cvEvents:GetBool() or not IsValid(ply) or ply:IsBot() then return end
     local verb = kind == "join" and "joined" or kind == "leave" and "left" or "died"
-    enqueue({ body = "* " .. clean(ply:Nick(), MAX_NAME) .. " " .. verb })
+    enqueue({ body = "* " .. verb, kind = kind, relayed_for = { steam_id = ply:SteamID64(), name = cleanName(ply:Nick()) } })
 end
 hook.Add("PlayerInitialSpawn", "GK_CommunityJoin", function(ply) timer.Simple(3, function() event("join", ply) end) end)
 hook.Add("PlayerDisconnected", "GK_CommunityLeave", function(ply) event("leave", ply) end)
@@ -275,12 +330,13 @@ concommand.Add("gk_community_mute", function(ply, _, args)
     if not IsValid(target) then return end
     local minutes = math.Clamp(math.floor(tonumber(args[2]) or 60), 1, 10080)
     C.muted[target:SteamID64()] = os.time() + minutes * 60
+    saveMutes()
     print(("[COMMUNiTY] %s muted %s on the relay for %d min"):format(IsValid(ply) and ply:Nick() or "console", target:Nick(), minutes))
 end)
 concommand.Add("gk_community_unmute", function(ply, _, args)
     if not GK.RequireAccess(ply, "gknuckle.moderate") then return end
     local target = GK.Bans and GK.Bans.FindTarget(args[1])
-    if IsValid(target) then C.muted[target:SteamID64()] = nil end
+    if IsValid(target) then C.muted[target:SteamID64()] = nil saveMutes() end
 end)
 
 concommand.Add("gk_community_status", function(ply)

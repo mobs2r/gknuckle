@@ -18,8 +18,12 @@ net.Receive("gk_community", function()
     local tag = "[COMMUNiTY] " -- where: "web" (a gk.style/Omerta user) or "server" (another game server's bot)
     local parts = { AMBER, tag }
     if rank ~= "" then parts[#parts + 1] = DIM parts[#parts + 1] = rank .. " " end
+    -- N4: always say where a name comes from, so a web user called "server" or named
+    -- like an in-game admin can't pass for one.
+    parts[#parts + 1] = DIM
+    parts[#parts + 1] = where == "web" and "web:" or "server:"
     parts[#parts + 1] = where == "web" and WEB or SRV
-    parts[#parts + 1] = name
+    parts[#parts + 1] = string.gsub(name, ":", "")
     parts[#parts + 1] = color_white
     parts[#parts + 1] = ": " .. body
     chat.AddText(unpack(parts))
