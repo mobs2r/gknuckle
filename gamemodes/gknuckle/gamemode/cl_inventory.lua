@@ -29,6 +29,7 @@ end
 -- WK shows items in the inventory as the same 2D sprites you hold them by:
 -- the item layer of each held layout (data_static/gknuckle/held.json).
 local spriteOf = {}
+hook.Add("GK_PackMounted", "GK_InvSprites", function() spriteOf = {} end) -- sprites come from playable-pack
 local function itemSprite(class)
     if spriteOf[class] == nil then
         spriteOf[class] = false

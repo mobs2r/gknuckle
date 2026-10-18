@@ -33,6 +33,7 @@ if SERVER then
     function ENT:StartTouch(ply)
         if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() or not self.GKTarget then return end
         if (ply.GK_NextPad or 0) > CurTime() then return end
+        if GK.PackReady and not GK.PackReady(ply) then ply.GK_NextPad = CurTime() + 1.5 GK.Pack.Nag(ply) return end
         ply.GK_NextPad = CurTime() + 1.5
         local wep = ply:GetActiveWeapon()
         if IsValid(wep) and wep.ReleaseAll then wep:ReleaseAll() end
