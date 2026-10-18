@@ -67,6 +67,7 @@ AddCSLuaFile("cl_drawhh.lua")
 AddCSLuaFile("cl_roomlights.lua")
 AddCSLuaFile("cl_mirror.lua")
 
+include("sv_apiauth.lua") -- signed id:secret API calls (pure-Lua HMAC-SHA256)
 include("sv_pack.lua") -- playable-pack: mounts the server copy before the rest loads
 include("shared.lua")
 include("sv_economy.lua")
