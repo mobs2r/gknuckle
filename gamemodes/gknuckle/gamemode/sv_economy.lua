@@ -6,14 +6,19 @@
 --   gk_economy_key "<id>:<secret>"   per-server key, scope gk:wallet (API_SPEC.md §1): only
 --                                    the id is sent and the secret HMAC-signs each request.
 --                  "<API_SECRET>"    legacy: the global secret sent as X-Api-Key. It can mint
---                                    unlimited coins, so it's accepted with a warning only
---                                    until the API has per-server keys.
+--                                    unlimited coins, so it is NOT sent unless
+--                                    gk_economy_legacy_key 1 is also set (default 0).
+--   gk_economy_legacy_key 1          the live server needs this (or a per-server key) to keep
+--                                    the economy working until the API ships per-server keys.
 -- With no key set, the economy is disabled and the gamemode runs without it.
 
 GK.Economy = GK.Economy or {}
 
 local cvApi = CreateConVar("gk_economy_api", "https://illicit.up.railway.app", { FCVAR_ARCHIVE, FCVAR_PROTECTED }, "omerta API origin")
 local cvKey = CreateConVar("gk_economy_key", "", { FCVAR_PROTECTED, FCVAR_DONTRECORD }, "Per-server key id:secret (legacy: the global API_SECRET)")
+
+local cvLegacy = CreateConVar("gk_economy_legacy_key", "0", { FCVAR_ARCHIVE, FCVAR_PROTECTED },
+    "1 = allow sending a non id:secret gk_economy_key as X-Api-Key (the global API secret; temporary)")
 
 local function enabled()
     return cvKey:GetString() ~= ""
@@ -43,9 +48,20 @@ local function request(method, path, body, onDone, originOverride)
         print(("[gKnuckle] %s %q is not on the allowlist (sv_apiauth.lua); request skipped"):format(label, origin))
         return done(0, { error = "origin not allowed" })
     end
+    -- H2 leftover: the global secret only goes out when explicitly opted in.
+    if not cvLegacy:GetBool() then
+        if not warnedLegacy then
+            warnedLegacy = true
+            MsgC(Color(255, 80, 80), "[gKnuckle] ECONOMY OFF: gk_economy_key is not an id:secret per-server key. "
+                .. "Refusing to send a legacy global secret. Set a per-server key, or gk_economy_legacy_key 1 to send it anyway.\n")
+        end
+        if onDone then onDone(false, { error = "legacy key not allowed" }, 0) end -- warned once above
+        return
+    end
     if not warnedLegacy then
         warnedLegacy = true
-        print("[gKnuckle] gk_economy_key is a legacy global secret (can mint coins). Switch to a per-server id:secret key when the API has them.")
+        MsgC(Color(255, 80, 80), "[gKnuckle] WARNING: gk_economy_legacy_key 1 - sending the GLOBAL API secret (it can mint unlimited coins) "
+            .. "as X-Api-Key. Replace it with a per-server id:secret key as soon as the API has them.\n")
     end
     HTTP({
         url = o .. path,
