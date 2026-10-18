@@ -40,13 +40,14 @@ local function mountServerPack()
         local f = GK.Pack.FileFor(sha)
         if f and file.Exists(f, "DATA") then
             local man = util.JSONToTable(file.Read(GK.Pack.DIR .. "/playable-pack.manifest.json", "DATA") or "") or {}
-            if man.sha256 == sha and tonumber(man.bytes) and file.Size(f, "DATA") ~= tonumber(man.bytes) then
-                print(("[gKnuckle] %s is the wrong size for release %s; not mounted"):format(f, GK.Pack.RELEASES[sha]))
+            if file.Size(f, "DATA") ~= GK.Pack.RELEASES[sha].bytes
+                or (man.sha256 == sha and tonumber(man.bytes) and file.Size(f, "DATA") ~= tonumber(man.bytes)) then
+                print(("[gKnuckle] %s is the wrong size for release %s; not mounted"):format(f, GK.Pack.ReleaseName(sha)))
             else
                 local ok, list = game.MountGMA("data/" .. f)
                 if ok then
                     GK.Pack.ServerMounted, GK.Pack.ServerSha = f, sha
-                    print(("[gKnuckle] mounted %s (%s, %d files)"):format(f, GK.Pack.RELEASES[sha], #list))
+                    print(("[gKnuckle] mounted %s (%s, %d files)"):format(f, GK.Pack.ReleaseName(sha), #list))
                     return
                 end
                 print("[gKnuckle] could not mount " .. f)
@@ -115,8 +116,8 @@ local function deliver(ply, have)
         ply.GK_PackApiDown = (code == 0 or code >= 500)
         if ok and data.licensed == true and istable(data.files) then
             local f = parseFile(data.files[1], data.server_time)
-            if f and not GK.Pack.Allowed(f.sha256) then
-                print(("[gKnuckle] API offered release %s that isn't in GK.Pack.RELEASES; update the gamemode"):format(string.sub(f.sha256, 1, 12)))
+            if f and not GK.Pack.MatchesRelease(f.sha256, f.bytes, f.chunkSize, f.chunks) then
+                print(("[gKnuckle] API offered release %s that doesn't match GK.Pack.RELEASES (sha, size, chunk size or chunk list); update the gamemode"):format(string.sub(f.sha256, 1, 12)))
                 f = nil
             end
             if f then

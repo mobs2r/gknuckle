@@ -74,7 +74,9 @@ do
     local idx = readIndex()
     local cv = GetConVar("gk_pack_sha256")
     local expected = cv and string.lower(cv:GetString()) or ""
+    -- N2: and only an index written by a download verified against the pinned chunk list.
     if idx.complete and idx.file and P.Allowed(idx.sha256) and idx.sha256 == expected
+        and P.MatchesRelease(idx.sha256, idx.bytes, idx.chunkSize) and idx.chunks == P.RELEASES[idx.sha256].chunks
         and file.Size(idx.file, "DATA") == idx.bytes then
         mount(idx, true)
     end
@@ -179,6 +181,11 @@ end
 
 local function startDownload(o)
     local idx = readIndex()
+    -- N2: an index from before chunk lists were pinned (or for different bytes) is redone.
+    if idx.sha256 == o.sha256 and (idx.chunks ~= P.RELEASES[o.sha256].chunks or idx.bytes ~= o.bytes) then
+        if idx.file then safeDelete(idx.file) end
+        idx = { old = idx.old }
+    end
     if idx.sha256 ~= o.sha256 then
         -- New release: drop an unfinished older download (a finished, mounted one is
         -- removed on a later launch once it's no longer in use).
@@ -191,6 +198,7 @@ local function startDownload(o)
             idx = { old = idx.old }
         end
         idx.sha256, idx.bytes, idx.chunkSize, idx.file, idx.done, idx.complete = o.sha256, o.bytes, o.chunkSize, P.FileFor(o.sha256), 0, false
+        idx.chunks = P.RELEASES[o.sha256].chunks -- only reached for an offer that matched it
         file.CreateDir(P.DIR)
         safeDelete(idx.file)
         writeIndex(idx)
@@ -227,6 +235,8 @@ net.Receive("gk_pack_offer", function()
         and o.chunkSize >= 1048576 and o.chunkSize <= 33554432
         and n <= P.MAX_CHUNKS and #o.chunks == math.ceil(o.bytes / o.chunkSize)
     if valid then for _, h in ipairs(o.chunks) do if not P.IsSha(h) then valid = false break end end end
+    -- N2: size, chunk size and chunk list must be the pinned ones for that release.
+    if valid and not P.MatchesRelease(o.sha256, o.bytes, o.chunkSize, o.chunks) then valid = false end
     if not valid then
         P.state, P.msg = "error", "This server offered a content pack this version of gKnuckle doesn't know, so it was ignored."
         return
