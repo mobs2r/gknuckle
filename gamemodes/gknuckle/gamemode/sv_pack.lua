@@ -4,7 +4,8 @@
 -- per-player ready flag that gates runs, arenas and training pads.
 -- Set in server.cfg (never anywhere a client can read):
 --   gk_pack_api      "https://illicit.up.railway.app"   Illicit API origin (empty = gating off)
---   gk_pack_key      "<GKNUCKLE_API_SECRET>"            service key, signs every request
+--   gk_pack_key      "<id>:<secret>"                    per-server key (scope gk:pack); only the id
+--                                                       is sent, the secret signs (sv_apiauth.lua)
 --   gk_pack_sha256   "<sha256 of this release's pack>"  lets cached packs count as ready if the API is down
 --   gk_pack_link_url "https://gk.style/link"
 -- The server's own copy of the pack (it needs .phy collision and the level JSON) is
@@ -19,8 +20,8 @@ util.AddNetworkString("gk_pack_ready")    -- C->S { sha256 mounted }
 util.AddNetworkString("gk_pack_offer")    -- S->C status, message, link, and the pack details when ok
 
 local cvApi = CreateConVar("gk_pack_api", "", { FCVAR_ARCHIVE, FCVAR_PROTECTED }, "Illicit API origin for playable-pack delivery (empty = off)")
-local cvKey = CreateConVar("gk_pack_key", "", { FCVAR_PROTECTED, FCVAR_DONTRECORD }, "gKnuckle service key for the Illicit API")
-local cvSha = CreateConVar("gk_pack_sha256", "", { FCVAR_ARCHIVE, FCVAR_PROTECTED }, "sha256 of the current playable-pack release")
+local cvKey = CreateConVar("gk_pack_key", "", { FCVAR_PROTECTED, FCVAR_DONTRECORD }, "Per-server Illicit key, id:secret (the secret is never sent)")
+local cvSha = GK.Pack.cvSha -- sh_pack.lua (replicated)
 local cvLink = CreateConVar("gk_pack_link_url", "https://gk.style/link", { FCVAR_ARCHIVE }, "Where players link Steam and verify White Knuckle")
 
 local function enabled() return cvApi:GetString() ~= "" end
@@ -29,67 +30,41 @@ timer.Create("GK_PackGate", 2, 0, function() SetGlobal2Bool("gk_pack_gate", enab
 -- Server copy --------------------------------------------------------------------
 local function mountServerPack()
     if GK.Pack.ServerMounted then return end
-    local files = file.Find(GK.Pack.DIR .. "/playable-pack*.gma", "DATA", "datedesc")
-    if not files or not files[1] then return end
-    local ok, list = game.MountGMA("data/" .. GK.Pack.DIR .. "/" .. files[1])
-    if ok then
-        GK.Pack.ServerMounted = files[1]
-        print(("[gKnuckle] mounted %s (%d files)"):format(files[1], #list))
-    else
-        print("[gKnuckle] could not mount " .. files[1])
+    -- L6: only a file named for an allowlisted release (the configured one first), and
+    -- only if its size matches that release's manifest when one sits next to it.
+    local order = {}
+    local want = string.lower(cvSha:GetString())
+    if GK.Pack.Allowed(want) then order[1] = want end
+    for sha in pairs(GK.Pack.RELEASES) do if sha ~= want then order[#order + 1] = sha end end
+    for _, sha in ipairs(order) do
+        local f = GK.Pack.FileFor(sha)
+        if f and file.Exists(f, "DATA") then
+            local man = util.JSONToTable(file.Read(GK.Pack.DIR .. "/playable-pack.manifest.json", "DATA") or "") or {}
+            if file.Size(f, "DATA") ~= GK.Pack.RELEASES[sha].bytes
+                or (man.sha256 == sha and tonumber(man.bytes) and file.Size(f, "DATA") ~= tonumber(man.bytes)) then
+                print(("[gKnuckle] %s is the wrong size for release %s; not mounted"):format(f, GK.Pack.ReleaseName(sha)))
+            else
+                local ok, list = game.MountGMA("data/" .. f)
+                if ok then
+                    GK.Pack.ServerMounted, GK.Pack.ServerSha = f, sha
+                    print(("[gKnuckle] mounted %s (%s, %d files)"):format(f, GK.Pack.ReleaseName(sha), #list))
+                    return
+                end
+                print("[gKnuckle] could not mount " .. f)
+            end
+        end
     end
 end
 mountServerPack()
 hook.Add("Initialize", "GK_PackServerMount", mountServerPack)
 
--- Service auth: X-GKnuckle-Key + HMAC-SHA256 (base64url) over
--- METHOD\nPATH\nTIMESTAMP\nhex(sha256(body)), the same canonical string as cod.city.
-local function hex2bin(h) return (string.gsub(h, "..", function(c) return string.char(tonumber(c, 16)) end)) end
-local function xorWith(s, n)
-    return (string.gsub(s, ".", function(c) return string.char(bit.bxor(string.byte(c), n)) end))
-end
-local function hmacSha256(key, msg)
-    if #key > 64 then key = hex2bin(util.SHA256(key)) end
-    key = key .. string.rep("\0", 64 - #key)
-    local inner = hex2bin(util.SHA256(xorWith(key, 0x36) .. msg))
-    return hex2bin(util.SHA256(xorWith(key, 0x5c) .. inner))
-end
-local function b64url(bin)
-    local s = util.Base64Encode(bin, true)
-    s = string.gsub(s, "%+", "-")
-    s = string.gsub(s, "/", "_")
-    s = string.gsub(s, "=+$", "")
-    return s
-end
-GK.Pack.HMAC = hmacSha256 -- exposed for a self-check against a known vector
-
+-- Service auth: sv_apiauth.lua. gk_pack_key is "id:secret"; only the id is sent,
+-- the secret HMAC-signs METHOD/PATH/TIMESTAMP/NONCE/body-hash (API_SPEC.md §1).
 local function request(path, body, onDone)
-    local origin = cvApi:GetString()
-    if not string.StartWith(string.lower(origin), "https://") then
-        print("[gKnuckle] gk_pack_api must start with https://; request skipped")
-        return onDone(false, 0, {})
-    end
-    local raw = util.TableToJSON(body or {})
-    local ts = tostring(os.time())
-    local canonical = "POST\n" .. path .. "\n" .. ts .. "\n" .. util.SHA256(raw)
-    HTTP({
-        url = origin .. path,
-        method = "POST",
-        type = "application/json",
-        body = raw,
-        timeout = 15,
-        headers = {
-            ["X-GKnuckle-Key"] = cvKey:GetString(),
-            ["X-GKnuckle-Timestamp"] = ts,
-            ["X-GKnuckle-Signature"] = b64url(hmacSha256(cvKey:GetString(), canonical)),
-            ["Accept"] = "application/json",
-        },
-        success = function(code, resp) onDone(code < 400, code, util.JSONToTable(resp or "") or {}) end,
-        failed = function(err)
-            print("[gKnuckle] pack API request failed: " .. tostring(err))
-            onDone(false, 0, {})
-        end,
-    })
+    GK.ApiAuth.Request(cvApi:GetString(), cvKey:GetString(), "POST", path, body, function(code, data)
+        if code == 0 then print("[gKnuckle] pack API request failed: " .. tostring(data.error)) end
+        onDone(code > 0 and code < 400, code, data)
+    end, "gk_pack_api")
 end
 
 -- Offer to the client ---------------------------------------------------------------
@@ -118,7 +93,7 @@ local function parseFile(e, serverTime)
     local url, sha = tostring(e.url or ""), string.lower(tostring(e.sha256 or ""))
     local bytes, cs = tonumber(e.bytes), tonumber(e.chunk_size)
     local chunks = istable(e.chunk_sha256) and e.chunk_sha256 or {}
-    if not string.StartWith(url, "https://") or #sha ~= 64 or not string.match(sha, HEX64) then return nil end
+    if not string.StartsWith(url, "https://") or #sha ~= 64 or not string.match(sha, HEX64) then return nil end
     if not bytes or bytes <= 0 or not cs or cs < 1048576 or cs > 33554432 then return nil end
     if #chunks ~= math.ceil(bytes / cs) or #chunks > GK.Pack.MAX_CHUNKS then return nil end
     for i, h in ipairs(chunks) do
@@ -137,18 +112,32 @@ local function deliver(ply, have)
     if ip == "127.0.0.1" or game.SinglePlayer() then ip = nil end
     request("/api/integrations/gknuckle/delivery", { steam_id = ply:SteamID64(), client_ip = ip, have_sha256 = have ~= "" and have or nil }, function(ok, code, data)
         if not IsValid(ply) then return end
+        -- M1: the cached-pack fallback is only for "API unreachable", never after a no.
+        ply.GK_PackApiDown = (code == 0 or code >= 500)
         if ok and data.licensed == true and istable(data.files) then
             local f = parseFile(data.files[1], data.server_time)
+            if f and not GK.Pack.MatchesRelease(f.sha256, f.bytes, f.chunkSize, f.chunks) then
+                print(("[gKnuckle] API offered release %s that doesn't match GK.Pack.RELEASES (sha, size, chunk size or chunk list); update the gamemode"):format(string.sub(f.sha256, 1, 12)))
+                f = nil
+            end
             if f then
                 ply.GK_PackOffer = f
                 return sendOffer(ply, "ok", "", f)
             end
             return sendOffer(ply, "unavailable", "The content server sent an invalid answer. Retrying later.")
         end
+        if ok and data.licensed == false and data.reason == "banned" then
+            -- Omerta global ban (API_SPEC.md §4): no content, no link prompt.
+            ply.GK_PackOffer = nil
+            ply:SetNW2Bool("gk_pack_ready", false)
+            return sendOffer(ply, "unlicensed", "Your Omerta account is banned, so gKnuckle content isn't available. The hub stays open.")
+        end
         if ok or code == 403 then
             ply.GK_PackOffer = nil
+            ply:SetNW2Bool("gk_pack_ready", false) -- M1: a no clears an earlier yes
             return sendOffer(ply, "unlicensed", GK.Pack.LinkMessage(data.link_url or cvLink:GetString()))
         end
+        if code == 401 then print("[gKnuckle] pack API rejected gk_pack_key (401): check the id:secret pair") end
         -- API down or erroring: a client whose cached pack matches this release can still play.
         sendOffer(ply, "unavailable", "The gKnuckle content server can't be reached right now. The hub stays playable; it will retry.")
     end)
@@ -163,12 +152,29 @@ end
 net.Receive("gk_pack_hello", function(_, ply)
     if not IsValid(ply) or throttled(ply, "GK_PackHelloAt", 5) then return end
     local have = string.lower(string.sub(net.ReadString(), 1, 64))
+    if not GK.Pack.IsSha(have) then have = "" end
     ply.GK_PackHave = have
+    -- L5: the SteamID has to be Steam-verified before it's used for a licence lookup.
+    if not ply:IsFullyAuthenticated() and not game.SinglePlayer() then
+        local tries = 0
+        return timer.Create("GK_PackAuth" .. ply:EntIndex(), 3, 20, function()
+            tries = tries + 1
+            if not IsValid(ply) then return end
+            if ply:IsFullyAuthenticated() then
+                timer.Remove("GK_PackAuth" .. ply:EntIndex())
+                deliver(ply, ply.GK_PackHave or "")
+            elseif tries == 20 then
+                sendOffer(ply, "unavailable", "Steam hasn't confirmed your account yet; rejoin to get gKnuckle content.")
+            end
+        end)
+    end
     deliver(ply, have)
 end)
 
 net.Receive("gk_pack_refresh", function(_, ply)
     if not IsValid(ply) or throttled(ply, "GK_PackRefreshAt", 8) then return end
+    -- N9: same L5 wait as hello, and only for a player who already has an offer.
+    if not ply.GK_PackOffer or not (ply:IsFullyAuthenticated() or game.SinglePlayer()) then return end
     deliver(ply, ply.GK_PackHave or "")
 end)
 
@@ -176,14 +182,18 @@ net.Receive("gk_pack_ready", function(_, ply)
     if not IsValid(ply) or throttled(ply, "GK_PackReadyAt", 2) then return end
     local sha = string.lower(string.sub(net.ReadString(), 1, 64))
     local offered = ply.GK_PackOffer and ply.GK_PackOffer.sha256
-    if (offered and sha == offered) or (cvSha:GetString() ~= "" and sha == string.lower(cvSha:GetString())) then
+    -- M1: the offered sha, or (only while the API is unreachable for this player) the
+    -- configured release. This is a convenience gate, not DRM: the server can't see
+    -- what a client really mounted. The real control is who gets a signed URL.
+    local fallback = ply.GK_PackApiDown and GK.Pack.Allowed(sha) and sha == string.lower(cvSha:GetString())
+    if (offered and sha == offered) or fallback then
         ply:SetNW2Bool("gk_pack_ready", true)
         print(("[gKnuckle] %s has playable-pack %s"):format(ply:Nick(), string.sub(sha, 1, 12)))
     end
 end)
 
 concommand.Add("gk_pack_status", function(ply)
-    if IsValid(ply) and not ply:IsAdmin() then return end
+    if not GK.RequireAccess(ply, "gknuckle.pack_status") then return end
     local lines = { ("gate %s, server pack %s"):format(tostring(enabled()), tostring(GK.Pack.ServerMounted)) }
     for _, p in ipairs(player.GetHumans()) do
         lines[#lines + 1] = ("  %s ready=%s"):format(p:Nick(), tostring(p:GetNW2Bool("gk_pack_ready", false)))

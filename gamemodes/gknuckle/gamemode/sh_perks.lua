@@ -146,7 +146,11 @@ if SERVER then
         GK.OfferPerks(ply, o.console) -- the backup card stays up if it's still to buy, else this closes the cards
         return true
     end
-    net.Receive("gk_perk_pick", function(_, ply) GK.PickPerk(ply, net.ReadString()) end)
+    net.Receive("gk_perk_pick", function(_, ply)
+        if not ply:Alive() or (ply.GK_NextPerkPick or 0) > CurTime() then return end
+        ply.GK_NextPerkPick = CurTime() + 0.25
+        GK.PickPerk(ply, string.sub(net.ReadString(), 1, 64))
+    end)
 
     -- Perks last the run: gone when you die or come back to the hub.
     hook.Add("PlayerSpawn", "GK_PerksReset", function(ply)

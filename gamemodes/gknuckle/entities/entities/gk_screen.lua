@@ -97,7 +97,7 @@ if CLIENT then
                 local lines = {}
                 for i, r in ipairs(GK.Hub.TopMoney(8) or {}) do lines[i] = ("%2d  %-14s %6d"):format(i, string.sub(r.name or "?", 1, 14), r.roaches or 0) end
                 if #lines > 0 then d = { title = "", lines = lines } end
-            elseif string.StartWith(kind, "run_") and GK.Hub.Arenas then
+            elseif string.StartsWith(kind, "run_") and GK.Hub.Arenas then
                 local a = (GK.Hub.Arenas() or {})[tonumber(string.sub(kind, 5)) or 0]
                 if a and a.active then
                     d = { title = "", lines = { ("RUN iN PROGRESS"), ("SUBJECTS ALiVE  %d / %d"):format(a.alive or 0, a.total or 0),
@@ -132,7 +132,7 @@ if CLIENT then
                     if i > 8 then break end
                     draw.SimpleText(l, "GK_ScreenLine", -W / 2 + 28, -H / 2 + 76 + (i - 1) * 32, Color(220, 230, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
                 end
-            elseif string.StartWith(kind, "run_") then
+            elseif string.StartsWith(kind, "run_") then
                 local pulse = 170 + 85 * math.sin(t * 3)
                 draw.SimpleText("PLAY NOW!", "GK_ScreenBig", 0, 30, Color(120, 255, 140, pulse), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                 draw.SimpleText("step onto the pad, subject", "GK_ScreenLine", 0, 110, Color(160, 180, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)

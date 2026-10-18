@@ -36,6 +36,7 @@ if SERVER then
                 local d = p:GetPos() - pos
                 if p:Alive() and d.z < 0 and d.z > -RANGE and Vector(d.x, d.y, 0):Length() < 400 then
                     local j = ents.Create("gk_trash")
+                    if not IsValid(j) then break end -- edict limit
                     j:SetModel(JUNK[math.random(#JUNK)])
                     j:SetPos(pos + VectorRand() * 30)
                     j:Spawn()

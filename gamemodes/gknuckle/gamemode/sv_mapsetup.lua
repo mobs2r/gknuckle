@@ -146,6 +146,6 @@ end
 hook.Add("InitPostEntity", "GK_StarterArea", function() timer.Simple(1, GK.SetupStarterArea) end)
 hook.Add("PostCleanupMap", "GK_StarterArea", function() timer.Simple(0, GK.SetupStarterArea) end)
 concommand.Add("gk_setup_area", function(ply)
-    if IsValid(ply) and not ply:IsAdmin() then return end
+    if not GK.RequireAccess(ply, "gknuckle.runs") then return end
     GK.SetupStarterArea()
 end)

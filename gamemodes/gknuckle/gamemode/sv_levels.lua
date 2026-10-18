@@ -334,7 +334,7 @@ function GK.SpawnRun(pieces, origin)
 end
 
 concommand.Add("gk_run", function(ply, _, args)
-    if IsValid(ply) and not ply:IsAdmin() then return end
+    if not GK.RequireAccess(ply, "gknuckle.runs") then return end
     local data = loadRegions()
     if not args[1] then
         local names = {}
@@ -386,7 +386,7 @@ function GK.FindSafeSpot(ply, near)
 end
 
 hook.Add("PlayerSpawn", "GK_WKSafeSpawn", function(ply)
-    if not string.StartWith(game.GetMap(), "gk_wk_") then return end
+    if not string.StartsWith(game.GetMap(), "gk_wk_") then return end
     timer.Simple(0.1, function()
         if not IsValid(ply) or not ply:Alive() or ply.GK_SpawnFixed == CurTime() then return end
         local spot = GK.FindSafeSpot(ply, ply:GetPos())
@@ -395,7 +395,7 @@ hook.Add("PlayerSpawn", "GK_WKSafeSpawn", function(ply)
 end)
 
 concommand.Add("gk_level", function(ply, _, args)
-    if IsValid(ply) and not ply:IsAdmin() then return end
+    if not GK.RequireAccess(ply, "gknuckle.runs") then return end
     if not args[1] then
         local msg = "Level pieces: " .. table.concat(GK.ListLevelPieces(), ", ")
         if IsValid(ply) then ply:ChatPrint(msg) else print(msg) end

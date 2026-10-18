@@ -1,0 +1,30 @@
+// gKnuckle server settings. Copy what you need into cfg/server.cfg.
+// Keys are secrets: keep this file's real copy out of git and off the Workshop.
+
+// Owner tier: every gKnuckle admin privilege (comma-separated SteamID64s). Empty = none.
+// Put your own SteamID64(s) here, e.g. gk_owner_steamids "7656119XXXXXXXXXX,7656119YYYYYYYYYY"
+gk_owner_steamids ""
+
+// Omerta roles (owner/admin/moderator) via GET /api/private/access-role (needs an id:secret key)
+gk_access_roles 1
+
+// Economy (CrabCoin) and backpack
+gk_economy_api "https://illicit.up.railway.app"
+gk_economy_key ""                 // "<id>:<secret>" per-server key
+gk_economy_legacy_key 0           // 1 only while gk_economy_key is still the global API secret
+gk_backpack_api "https://illicit.up.railway.app"
+
+// playable-pack delivery (empty = off; Workshop content as before)
+gk_pack_api ""
+gk_pack_key ""                    // "<id>:<secret>", scope gk:pack
+gk_pack_sha256 "48e09ef6f5fbfca14d3550c8aa5b0c787d9d412196944ffa35122d28277437c7"
+
+// Omerta global bans (empty = off)
+gk_bans_api ""
+gk_bans_key ""                    // "<id>:<secret>", scope gk:bans (empty = gk_pack_key)
+gk_bans_failmode "open"           // open | closed
+
+// COMMUNiTY chat bridge (empty = off)
+gk_community_api ""
+gk_community_bot_token ""         // omb_... bot token
+gk_community_channel "gknuckle"

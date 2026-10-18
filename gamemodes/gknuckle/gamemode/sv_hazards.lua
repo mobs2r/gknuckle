@@ -216,7 +216,7 @@ end)
 
 -- Debug: gk_hazards_here lists the zones you're standing in.
 concommand.Add("gk_hazards_here", function(ply)
-    if not IsValid(ply) or not ply:IsAdmin() then return end -- debug: prints to the server console
+    if not IsValid(ply) or not GK.RequireAccess(ply, "gknuckle.hazards_debug") then return end -- debug: prints to the server console
     local rooms = zones[GK.ArenaOf(ply)] or {}
     for n, list in pairs(rooms) do
         for _, z in ipairs(list) do

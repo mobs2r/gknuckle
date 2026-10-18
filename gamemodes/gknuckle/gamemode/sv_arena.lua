@@ -29,6 +29,14 @@ local cvRegions = CreateConVar("gk_run_regions", "3", FCVAR_ARCHIVE, "Regions pe
 local cvBreak = CreateConVar("gk_break_time", "30", FCVAR_ARCHIVE, "Seconds in the break room between regions")
 local cvRise = CreateConVar("gk_tube_rise", "1", FCVAR_ARCHIVE, "Ride up the staging tube before arriving in a run")
 local cvReward = CreateConVar("gk_arena_reward", "25", FCVAR_ARCHIVE, "CrabCoin for each player on the winning team")
+local cvMinSecs = CreateConVar("gk_arena_reward_min_secs", "90", FCVAR_ARCHIVE, "Runs shorter than this pay no CrabCoin")
+-- N5: alt farming. Any death (whatever killed you) this early, or before climbing this
+-- far, is a forfeit; a "last standing" rival must have climbed this far too; and each
+-- SteamID is paid at most once per cooldown (plus gk_economy_daily_cap in sv_economy.lua).
+local cvForfeitSecs = CreateConVar("gk_arena_forfeit_secs", "120", FCVAR_ARCHIVE, "Deaths within this many seconds of the start count as a forfeit")
+local cvMinClimb = CreateConVar("gk_arena_min_climb", "16", FCVAR_ARCHIVE, "Metres a player must climb before their death isn't a forfeit (and to count as a rival)")
+local cvCooldown = CreateConVar("gk_arena_reward_cooldown", "600", FCVAR_ARCHIVE, "Seconds between arena payouts for one SteamID")
+local paidAt = {} -- SteamID64 -> os.time() of the last arena payout
 
 GK.Rounds = GK.Rounds or { arenas = {}, forceUntil = 0 }
 local R = GK.Rounds
@@ -131,10 +139,26 @@ end
 
 -- The pause menu's LEAVE RUN (WK's End Run): you die where you are, and the
 -- run carries on for anyone else in it.
+util.AddNetworkString("gk_ascended") -- WK's 50 m chime (was SendLua)
+
 concommand.Add("gk_leaverun", function(ply)
     if not IsValid(ply) or not ply:Alive() then return end
-    if not R.arenas[GK.ArenaOf(ply)] then return end
+    local a = R.arenas[GK.ArenaOf(ply)]
+    if not a then return end
+    a.forfeit = a.forfeit or {}
+    a.forfeit[ply] = true -- M4: leaving hands nobody a "last team standing" payout
     ply:Kill()
+end)
+-- M4/N5: a self-kill, or any death (another player, the Mass, gas, a hazard) early in
+-- the run or before climbing gk_arena_min_climb, counts as a forfeit.
+local function climbed(a, p) return (a.climb and a.climb[p] or 0) >= cvMinClimb:GetFloat() * 39.37 end
+hook.Add("PlayerDeath", "GK_ArenaForfeit", function(ply, _, attacker)
+    local a = R.arenas[GK.ArenaOf(ply)]
+    if not a then return end
+    if attacker == ply or CurTime() - (a.runStarted or a.started or 0) < cvForfeitSecs:GetFloat() or not climbed(a, ply) then
+        a.forfeit = a.forfeit or {}
+        a.forfeit[ply] = true
+    end
 end)
 
 -- WK's campaign goes Silos -> Pipeworks -> Habitation, a break room between
@@ -156,7 +180,7 @@ function GK.StartArena(index, players, forced)
     local info = GK.Arena.Start(index, GK.StageRegion(1), os.time() + index)
     if not info then return end
     local mode = R.padMode[index] or R.padMode[0] or GK.DefaultRunMode()
-    local a = { index = index, teams = {}, players = {}, info = info, started = CurTime(), gas = nil, forced = forced, teamCount = #teams, stage = 1, mode = mode }
+    local a = { index = index, teams = {}, players = {}, info = info, started = CurTime(), runStarted = CurTime(), startedAt = os.time(), gas = nil, forced = forced, teamCount = #teams, stage = 1, mode = mode }
     SetGlobal2String("gk_arena_mode_" .. index, mode)
     R.arenas[index] = a
     for t, members in ipairs(teams) do
@@ -210,15 +234,36 @@ hook.Add("Tick", "GK_TubeRise", function()
     end
 end)
 
-function GK.EndArena(index, winTeam)
+-- M4: is this win worth CrabCoin? Not for short runs, and a "last team standing"
+-- win only counts against at least one other real player who didn't forfeit.
+local function payable(a, winTeam, how)
+    -- R3: whole-run time (runStarted is set once); a.started restarts each region.
+    if CurTime() - (a.runStarted or a.started or CurTime()) < cvMinSecs:GetFloat() then return false end
+    if how ~= "last" then return true end
+    local rivals = 0
+    for _, p in ipairs(a.players) do
+        if IsValid(p) and not p:IsBot() and a.teams[p] ~= winTeam and not (a.forfeit and a.forfeit[p]) and climbed(a, p) then rivals = rivals + 1 end
+    end
+    return rivals >= 1
+end
+
+-- how: "top" (reached the top of the last region), "last" (last team standing) or nil.
+function GK.EndArena(index, winTeam, how)
     local a = R.arenas[index]
     if not a then return end
     R.arenas[index] = nil
     local winners = {}
+    local pay = winTeam ~= nil and payable(a, winTeam, how)
     for _, p in ipairs(a.players) do
         if IsValid(p) and a.teams[p] == winTeam then
             winners[#winners + 1] = p
-            GK.Economy.Add(p, cvReward:GetInt(), "gknuckle_arena_win")
+            local sid = p:SteamID64() or ""
+            if pay and not p:IsBot() and os.time() - (paidAt[sid] or 0) >= cvCooldown:GetInt() then
+                paidAt[sid] = os.time()
+                -- One payout per player per run, even if this is ever called twice.
+                GK.Economy.Add(p, cvReward:GetInt(), "gknuckle_arena_win",
+                    GK.ApiAuth.EventId("arena_win", p, index .. ":" .. (a.startedAt or 0)))
+            end
             p:EmitSound("ambient/levels/citadel/portal_beam_shoot" .. math.random(1, 6) .. ".wav", 70)
         end
     end
@@ -374,7 +419,7 @@ function GK.ArenaBreak(index)
         if info then a.info = info end
         a.stage = a.stage + 1
         for _, p in ipairs(a.players) do if IsValid(p) and p.GK_Ascended then p.GK_Ascended[a] = 0 end end
-        a.started = CurTime()
+        a.started = CurTime() -- per-region (Mass grace); forfeit/min-time use a.runStarted
         a.gas = a.info.bounds and a.info.bounds.mins and a.info.bounds.mins.z or ((a.info.spawn or vector_origin).z - 200)
         local n = 0
         for _, p in ipairs(a.players) do
@@ -491,6 +536,16 @@ end)
 timer.Create("GK_Rounds", 0.25, 0, function()
     for index, a in pairs(R.arenas) do
         local info = a.info
+        -- N5: how high each player has got this run (above the current region's spawn).
+        if info.spawn then
+            a.climb = a.climb or {}
+            for _, p in ipairs(a.players) do
+                if IsValid(p) and p:Alive() and GK.ArenaOf(p) == index then
+                    local h = p:GetPos().z - info.spawn.z
+                    if h > (a.climb[p] or 0) then a.climb[p] = h end
+                end
+            end
+        end
         -- Start the Mass: someone not resting is 16 m up, or the grace ran out.
         if not a.massAt and not a.inBreak and info.spawn then
             local start = CurTime() - a.started >= cvGrace:GetFloat()
@@ -544,7 +599,7 @@ timer.Create("GK_Rounds", 0.25, 0, function()
                     p.GK_Ascended = p.GK_Ascended or {}
                     if m > (p.GK_Ascended[a] or 0) then
                         p.GK_Ascended[a] = m
-                        p:SendLua("surface.PlaySound('gknuckle/ui/ascended.ogg')")
+                        net.Start("gk_ascended") net.Send(p)
                     end
                 end
                 teamsAlive[a.teams[p]] = true
@@ -552,7 +607,7 @@ timer.Create("GK_Rounds", 0.25, 0, function()
                     if (a.stage or 1) < cvRegions:GetInt() then
                         GK.TeamToBreak(index, a.teams[p]) -- this squad made it through: rest
                     else
-                        GK.EndArena(index, a.teams[p]) -- top of the last region: that team wins
+                        GK.EndArena(index, a.teams[p], "top") -- top of the last region: that team wins
                         return
                     end
                 end
@@ -565,7 +620,7 @@ timer.Create("GK_Rounds", 0.25, 0, function()
         elseif alive == 0 then
             GK.EndArena(index, nil)
         elseif table.Count(teamsAlive) == 1 and a.teamCount > 1 then
-            GK.EndArena(index, next(teamsAlive)) -- last team standing (a solo run goes on to the top)
+            GK.EndArena(index, next(teamsAlive), "last") -- last team standing (a solo run goes on to the top)
         end
     end
 end)

@@ -15,7 +15,7 @@ GK.SandboxGuard = GK.SandboxGuard or {}
 -- true = this player is allowed Sandbox powers.
 function GK.SandboxGuard.Allowed(ply)
     if not cvGuard:GetBool() then return true end
-    return not IsValid(ply) or ply:IsAdmin()
+    return not IsValid(ply) or GK.HasAccess(ply, "gknuckle.sandbox")
 end
 
 local function deny(ply)
@@ -27,6 +27,14 @@ for _, h in ipairs({ "PlayerSpawnProp", "PlayerSpawnRagdoll", "PlayerSpawnEffect
     "CanTool", "CanProperty", "CanDrive" }) do
     hook.Add(h, "GK_SandboxGuard", deny)
 end
+
+-- L1 defence in depth: no physgun grabs, and no picking up the physgun/toolgun, for
+-- players without gknuckle.sandbox (another addon's hook returning true can't hand them out).
+hook.Add("PhysgunPickup", "GK_SandboxGuard", function(ply) if not GK.SandboxGuard.Allowed(ply) then return false end end)
+hook.Add("PlayerCanPickupWeapon", "GK_SandboxGuard", function(ply, wep)
+    local c = IsValid(wep) and wep:GetClass()
+    if (c == "weapon_physgun" or c == "gmod_tool") and not GK.SandboxGuard.Allowed(ply) then return false end
+end)
 
 hook.Add("PlayerNoClip", "GK_SandboxGuard", function(ply, desired)
     if not desired then return end -- always allow turning noclip off

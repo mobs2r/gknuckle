@@ -2,7 +2,7 @@
 -- earlier session is mounted before any other gKnuckle Lua creates Material()s
 -- (game.MountGMA does not repair error materials that were already loaded).
 -- First time: the server hands over a short-lived signed Bunny URL; the whole pack
--- is fetched in 8 MiB Range chunks, each checked with util.SHA256 against the
+-- is fetched in 8 MiB Range chunks, each checked with SHA-256 (sh_sha256.lua) against the
 -- manifest, appended to data/gknuckle/packs/, resumable across crashes and sessions.
 -- Then game.MountGMA, re-init hooks (GK_PackMounted), and gk_pack_ready to the server.
 include("sh_pack.lua")
@@ -24,7 +24,17 @@ if not P.fontHooked then
     P.rawCreateFont = create
 end
 
-local function readIndex() return util.JSONToTable(file.Read(P.INDEX, "DATA") or "") or {} end
+-- M2: the index is only trusted for releases on GK.Pack.RELEASES, with the file name
+-- this code derives from the sha. Anything else is treated as no index at all.
+local function readIndex()
+    local t = util.JSONToTable(file.Read(P.INDEX, "DATA") or "") or {}
+    if not P.Allowed(t.sha256) or t.file ~= P.FileFor(t.sha256) then t = { old = t.old } end
+    local old = {}
+    for _, f in ipairs(istable(t.old) and t.old or {}) do if P.IsPackFile(f) then old[#old + 1] = f end end
+    t.old = #old > 0 and old or nil
+    return t
+end
+local function safeDelete(f) if P.IsPackFile(f) and file.Exists(f, "DATA") then file.Delete(f) end end
 local function writeIndex(t)
     file.CreateDir(P.DIR)
     file.Write(P.INDEX, util.TableToJSON(t))
@@ -36,7 +46,7 @@ local function mount(idx, early)
     if not ok then
         P.state, P.msg = "error", "The gKnuckle content pack couldn't be mounted. It will be downloaded again."
         idx.complete, idx.done = false, 0
-        file.Delete(idx.file)
+        safeDelete(idx.file)
         writeIndex(idx)
         return false
     end
@@ -47,7 +57,7 @@ local function mount(idx, early)
         for name, data in pairs(P.fonts) do P.rawCreateFont(name, data) end
         for _, e in ipairs(ents.GetAll()) do
             local m = IsValid(e) and e.GetModel and e:GetModel()
-            if m and string.StartWith(m, "models/gknuckle/") then e:SetModel(m) end
+            if m and string.StartsWith(m, "models/gknuckle/") then e:SetModel(m) end
         end
         hook.Run("GK_PackMounted", files)
         chat.AddText(Color(120, 200, 255), "[gKnuckle] ", color_white,
@@ -58,8 +68,16 @@ end
 
 -- A pack cached from an earlier session: mount it right now, while this file loads.
 do
+    -- M2: only an allowlisted release, and only when this server expects that same
+    -- release (gk_pack_sha256 is replicated, so it's known before client Lua runs).
+    -- Otherwise it waits for this server's own offer.
     local idx = readIndex()
-    if idx.complete and idx.file and idx.sha256 and file.Size(idx.file, "DATA") == idx.bytes then
+    local cv = GetConVar("gk_pack_sha256")
+    local expected = cv and string.lower(cv:GetString()) or ""
+    -- N2: and only an index written by a download verified against the pinned chunk list.
+    if idx.complete and idx.file and P.Allowed(idx.sha256) and idx.sha256 == expected
+        and P.MatchesRelease(idx.sha256, idx.bytes, idx.chunkSize) and idx.chunks == P.RELEASES[idx.sha256].chunks
+        and file.Size(idx.file, "DATA") == idx.bytes then
         mount(idx, true)
     end
 end
@@ -125,7 +143,7 @@ nextChunk = function(idx)
     local have = file.Size(idx.file, "DATA") or 0
     if have ~= from then
         -- A chunk was half-written when the game closed: start that pack again.
-        if have > from then file.Delete(idx.file) idx.done = 0 writeIndex(idx) return nextChunk(idx) end
+        if have > from then safeDelete(idx.file) idx.done = 0 writeIndex(idx) return nextChunk(idx) end
         idx.done = math.floor(have / o.chunkSize)
         writeIndex(idx)
         return nextChunk(idx)
@@ -146,7 +164,7 @@ nextChunk = function(idx)
             if (code ~= 206 and not (code == 200 and from == 0 and want == o.bytes)) or not body or #body ~= want then
                 return retryLater(idx, "bad response " .. tostring(code))
             end
-            if util.SHA256(body) ~= o.chunks[i] then return retryLater(idx, "chunk " .. i .. " failed its sha256 check") end
+            if GK.SHA256HexFast(body) ~= o.chunks[i] then return retryLater(idx, "chunk " .. i .. " failed its sha256 check") end
             file.Append(idx.file, body)
             body = nil
             if file.Size(idx.file, "DATA") ~= to + 1 then return retryLater(idx, "couldn't write to data/") end
@@ -163,10 +181,15 @@ end
 
 local function startDownload(o)
     local idx = readIndex()
+    -- N2: an index from before chunk lists were pinned (or for different bytes) is redone.
+    if idx.sha256 == o.sha256 and (idx.chunks ~= P.RELEASES[o.sha256].chunks or idx.bytes ~= o.bytes) then
+        if idx.file then safeDelete(idx.file) end
+        idx = { old = idx.old }
+    end
     if idx.sha256 ~= o.sha256 then
         -- New release: drop an unfinished older download (a finished, mounted one is
         -- removed on a later launch once it's no longer in use).
-        if idx.file and not idx.complete then file.Delete(idx.file) end
+        if idx.file and not idx.complete then safeDelete(idx.file) end
         if idx.file and idx.complete then
             local old = readIndex().old or {}
             old[#old + 1] = idx.file
@@ -175,8 +198,9 @@ local function startDownload(o)
             idx = { old = idx.old }
         end
         idx.sha256, idx.bytes, idx.chunkSize, idx.file, idx.done, idx.complete = o.sha256, o.bytes, o.chunkSize, P.FileFor(o.sha256), 0, false
+        idx.chunks = P.RELEASES[o.sha256].chunks -- only reached for an offer that matched it
         file.CreateDir(P.DIR)
-        if file.Exists(idx.file, "DATA") then file.Delete(idx.file) end
+        safeDelete(idx.file)
         writeIndex(idx)
     end
     if idx.complete and file.Size(idx.file, "DATA") == idx.bytes then return finish(idx) end
@@ -190,18 +214,33 @@ net.Receive("gk_pack_offer", function()
     P.link = link
     if status == "disabled" then P.state, P.msg = "idle", "" return end
     if status ~= "ok" then
-        -- Unlicensed or the API is down. A cached pack for this release still counts.
+        -- The API is down: a cached pack for this release still counts (the server only
+        -- accepts that while the API is unreachable). Unlicensed: nothing to report.
         P.offer = nil
-        if P.mountedSha then sendReady(P.mountedSha) end
+        if P.mountedSha and status == "unavailable" then sendReady(P.mountedSha) end
         P.state = P.mountedSha and "mounted" or status
         P.msg = P.mountedSha and "" or message
         if status == "unlicensed" and not P.mountedSha then chat.AddText(Color(255, 170, 90), "[gKnuckle] ", color_white, message) end
         if status == "unavailable" then timer.Create("GK_PackHelloRetry", 120, 1, sendHello) end
         return
     end
-    local o = { url = net.ReadString(), expiresAt = RealTime() + net.ReadUInt(12), sha256 = net.ReadString(),
+    local o = { url = net.ReadString(), expiresAt = RealTime() + net.ReadUInt(12), sha256 = string.lower(net.ReadString()),
         bytes = net.ReadDouble(), chunkSize = net.ReadUInt(32), chunks = {} }
-    for i = 1, net.ReadUInt(10) do o.chunks[i] = net.ReadString() end
+    local n = net.ReadUInt(10)
+    for i = 1, math.min(n, P.MAX_CHUNKS) do o.chunks[i] = string.lower(net.ReadString()) end
+    -- M2: mirror the server's parseFile, plus the release allowlist. A gKnuckle server
+    -- can't make this client fetch or mount anything but a known release.
+    local valid = string.match(o.url, "^https://[%w%.%-]+/") and P.Allowed(o.sha256)
+        and o.bytes == o.bytes and o.bytes > 0 and o.bytes <= 4294967296
+        and o.chunkSize >= 1048576 and o.chunkSize <= 33554432
+        and n <= P.MAX_CHUNKS and #o.chunks == math.ceil(o.bytes / o.chunkSize)
+    if valid then for _, h in ipairs(o.chunks) do if not P.IsSha(h) then valid = false break end end end
+    -- N2: size, chunk size and chunk list must be the pinned ones for that release.
+    if valid and not P.MatchesRelease(o.sha256, o.bytes, o.chunkSize, o.chunks) then valid = false end
+    if not valid then
+        P.state, P.msg = "error", "This server offered a content pack this version of gKnuckle doesn't know, so it was ignored."
+        return
+    end
     local refreshing = P.offer and P.offer.sha256 == o.sha256
     P.offer = o
     P.refreshPending = nil
@@ -214,7 +253,7 @@ end)
 hook.Add("InitPostEntity", "GK_PackHello", function()
     -- Leftover packs from older releases (no longer mounted this session).
     local idx = readIndex()
-    for _, f in ipairs(idx.old or {}) do if f ~= idx.file then file.Delete(f) end end
+    for _, f in ipairs(idx.old or {}) do if f ~= idx.file then safeDelete(f) end end
     if idx.old then idx.old = nil writeIndex(idx) end
     P.state = P.mountedSha and "mounted" or "waiting"
     timer.Simple(1, sendHello)
