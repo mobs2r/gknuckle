@@ -190,7 +190,7 @@ net.Receive("gk_pack_ready", function(_, ply)
 end)
 
 concommand.Add("gk_pack_status", function(ply)
-    if IsValid(ply) and not ply:IsAdmin() then return end
+    if not GK.RequireAccess(ply, "gknuckle.pack_status") then return end
     local lines = { ("gate %s, server pack %s"):format(tostring(enabled()), tostring(GK.Pack.ServerMounted)) }
     for _, p in ipairs(player.GetHumans()) do
         lines[#lines + 1] = ("  %s ready=%s"):format(p:Nick(), tostring(p:GetNW2Bool("gk_pack_ready", false)))

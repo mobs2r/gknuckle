@@ -7,6 +7,8 @@ GM.TeamBased = false
 DeriveGamemode("sandbox")
 
 GK = GK or {}
+include("sh_admin.lua") -- CAMI privileges (ULX/SAM/ServerGuard/sAdmin or plain usergroups)
+include("sh_ulx_gk.lua") -- ulx gkgive/gktake/gkarena/gkpack, only when ULX is installed
 
 -- Merged into the existing table on a Lua refresh, so files that cached
 -- `local C = GK.Config` see new keys too (no "nil config value" errors).

@@ -310,12 +310,12 @@ if SERVER then
     end
 
     concommand.Add("gk_face_summon", function(ply)
-        if IsValid(ply) and not ply:IsAdmin() and not GetConVar("sv_cheats"):GetBool() then return end
+        if not GetConVar("sv_cheats"):GetBool() and not GK.RequireAccess(ply, "gknuckle.face") then return end
         local at = IsValid(ply) and ply:GetPos() or Vector(0, 0, 0)
         GK.SpawnFace(at, { below = 40 * M })
     end, nil, "Summon the Face 40 m below you (admin or sv_cheats)")
     concommand.Add("gk_face_setstate", function(ply, _, args)
-        if IsValid(ply) and not ply:IsAdmin() and not GetConVar("sv_cheats"):GetBool() then return end
+        if not GetConVar("sv_cheats"):GetBool() and not GK.RequireAccess(ply, "gknuckle.face") then return end
         local s = ST[string.upper(args[1] or "stalk")]
         for _, f in ipairs(ents.FindByClass("gk_face")) do if s then f:SetState(s) end end
     end, nil, "WK's face-setstate: stalk, hunt or block")

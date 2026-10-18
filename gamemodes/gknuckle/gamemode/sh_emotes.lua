@@ -101,7 +101,7 @@ if CLIENT then
     local cvSpawn = CreateClientConVar("gk_spawnmenu", "0", true, false, "Admins: let Q open the spawn menu")
     function GM:SpawnMenuOpen()
         local ply = LocalPlayer()
-        return cvSpawn:GetBool() and IsValid(ply) and ply:IsAdmin()
+        return cvSpawn:GetBool() and IsValid(ply) and GK.HasAccess(ply, "gknuckle.spawnmenu")
     end
 
     -- C: the emote wheel instead of the context menu.

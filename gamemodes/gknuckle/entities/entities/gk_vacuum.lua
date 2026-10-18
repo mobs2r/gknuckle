@@ -118,7 +118,7 @@ if SERVER then
     end
 
     concommand.Add("gk_vacuum_fire", function(ply)
-        if IsValid(ply) and not ply:IsAdmin() then return end
+        if not GK.RequireAccess(ply, "gknuckle.runs") then return end
         for _, v in ipairs(ents.FindByClass("gk_vacuum")) do v:Fire_() end
     end)
 end

@@ -218,7 +218,7 @@ end)
 
 -- Admin: gk_spawn_creature <class> puts one where you're looking.
 concommand.Add("gk_spawn_creature", function(ply, _, args)
-    if not IsValid(ply) or not ply:IsAdmin() then return end
+    if not IsValid(ply) or not GK.RequireAccess(ply, "gknuckle.spawn_creature") then return end
     -- Only gKnuckle's own scripted entities: an arbitrary class here could be
     -- lua_run / point_servercommand, which would give any admin server-side Lua.
     local class = string.lower(args[1] or "gk_bloodbug")

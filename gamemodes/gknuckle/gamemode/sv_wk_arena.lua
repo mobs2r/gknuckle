@@ -357,7 +357,7 @@ end
 
 -- Admin helpers for testing.
 concommand.Add("gk_arena_start", function(ply, _, args)
-    if IsValid(ply) and not ply:IsAdmin() then return end
+    if not GK.RequireAccess(ply, "gknuckle.runs") then return end
     local index = tonumber(args[1]) or Arena.Free() or 1
     local info, err = Arena.Start(index, args[2], tonumber(args[3]))
     local msg = info and ("[gKnuckle] arena %d: %s (%d rooms, top z %d)"):format(index, info.region, #info.pieces, info.top) or ("[gKnuckle] " .. tostring(err))
@@ -368,10 +368,10 @@ concommand.Add("gk_arena_start", function(ply, _, args)
     end
 end)
 concommand.Add("gk_arena_clear", function(ply, _, args)
-    if IsValid(ply) and not ply:IsAdmin() then return end
+    if not GK.RequireAccess(ply, "gknuckle.runs") then return end
     Arena.Clear(tonumber(args[1]) or 1)
 end)
 concommand.Add("gk_arena_gas", function(ply, _, args)
-    if IsValid(ply) and not ply:IsAdmin() then return end
+    if not GK.RequireAccess(ply, "gknuckle.runs") then return end
     Arena.SetGasHeight(tonumber(args[1]) or 1, tonumber(args[2]) or 0)
 end)
