@@ -147,6 +147,10 @@ function GK.StageRegion(stage)
 end
 
 function GK.StartArena(index, players, forced)
+    local cleared = {}
+    for _, p in ipairs(players) do if GK.PackReady(p) then cleared[#cleared + 1] = p else GK.Pack.Nag(p) end end
+    players = cleared
+    if #players == 0 then return end
     local squads = not forced
     local teams = makeTeams(players, squads)
     local info = GK.Arena.Start(index, GK.StageRegion(1), os.time() + index)
@@ -238,7 +242,11 @@ hook.Add("GK_VacuumPull", "GK_Rounds", function(inZone, freeIndex)
     local players = {}
     for _, p in ipairs(inZone) do
         if IsValid(p) and p:Alive() and not inArena(p) then
-            players[#players + 1] = p
+            if GK.PackReady(p) then
+                players[#players + 1] = p
+            else
+                GK.Pack.Nag(p) -- still downloading playable-pack, or not licensed: stays in the hub
+            end
         end
     end
     if #players == 0 then return true end

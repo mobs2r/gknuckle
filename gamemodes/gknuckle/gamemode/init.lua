@@ -67,6 +67,7 @@ AddCSLuaFile("cl_drawhh.lua")
 AddCSLuaFile("cl_roomlights.lua")
 AddCSLuaFile("cl_mirror.lua")
 
+include("sv_pack.lua") -- playable-pack: mounts the server copy before the rest loads
 include("shared.lua")
 include("sv_economy.lua")
 include("sv_sandbox_guard.lua")
@@ -94,14 +95,11 @@ include("sv_birthing.lua")
 -- sounds, the gk_style map) from its Workshop item.
 resource.AddWorkshop("3479529954") -- the original gKnuckle item (3815586706 was a mistaken duplicate)
 
--- White Knuckle's UI fonts (MonocleFixed for terminals, Smart 9 for the pixel HUD).
-resource.AddFile("resource/fonts/monoclefixed_gui.ttf")
-resource.AddFile("resource/fonts/wk_smart9.ttf")
-
--- Ship the hand sprites to clients (materials/ sits at the addon root).
-for _, f in ipairs(file.Find("materials/gknuckle/hands/holo/*.png", "GAME")) do
-    resource.AddSingleFile("materials/gknuckle/hands/holo/" .. f)
-end
+-- Required Workshop items: the White Knuckle Prop Pack and NPCs Pack.
+resource.AddWorkshop("3817814674")
+resource.AddWorkshop("3818830408")
+-- White Knuckle's UI fonts and the hand sprites now ship in playable-pack.gma
+-- (cl_pack.lua), so they're no longer sent with resource.AddFile.
 
 local C = GK.Config
 
