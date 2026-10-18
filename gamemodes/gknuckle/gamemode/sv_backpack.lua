@@ -43,6 +43,17 @@ local function send(sid)
     p.next, p.inflight, p.since = nil, true, CurTime()
     request("POST", "/api/private/gknuckle/save", body, function(ok, data, code)
         p.inflight = false
+        if code == 409 then
+            -- N6: another server (or a later save) holds a newer version: adopt it and reload
+            -- this player's backpack from the API instead of overwriting it.
+            versions[sid] = math.max(versions[sid] or 0, math.floor(tonumber(istable(data) and data.version) or 0))
+            p.next = nil
+            pending[sid] = nil
+            local ply = player.GetBySteamID64(sid)
+            if IsValid(ply) then ply.GK_BackpackLoaded = false GK.Backpack.Load(ply) end
+            print(("[gKnuckle] backpack save for %s was stale (409); reloaded"):format(sid))
+            return
+        end
         if not ok then print(("[gKnuckle] backpack save for %s failed (%s)"):format(sid, tostring(code))) end
         if p.next then return send(sid) end
         pending[sid] = nil
@@ -76,7 +87,10 @@ function GK.Backpack.Load(ply, tries)
     request("GET", "/api/private/gknuckle/" .. sid, nil, function(ok, data)
         if not ok or not IsValid(ply) then return end
         ply:SetNW2Int("gk_bank", math.Clamp(math.floor(tonumber(data.bugz) or 0), 0, GK.RoachCap or 999)) -- saved roaches come back banked
-        ply.GK_BackpackVersion = (versions[sid] or 0) + 1
+        -- N6: continue from the API's stored version (survives restarts and other servers).
+        local stored = math.floor(tonumber(data.version) or 0)
+        versions[sid] = math.max(stored, versions[sid] or 0)
+        ply.GK_BackpackVersion = versions[sid] + 1
         ply.GK_BackpackLoaded = true
     end)
 end
