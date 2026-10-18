@@ -11,6 +11,7 @@ include("cl_inventory.lua")
 include("cl_post.lua")
 include("cl_status.lua")
 include("cl_pausemenu.lua")
+include("cl_chatbridge.lua")
 
 -- Gored corpses: charred grey, no head, no legs (matches their grey hands).
 hook.Add("CreateClientsideRagdoll", "GK_GoredRagdoll", function(owner, rag)

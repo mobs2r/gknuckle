@@ -91,6 +91,8 @@ include("sv_levels.lua")
 include("sv_wk_arena.lua")
 include("sv_hostname.lua")
 include("sv_birthing.lua")
+include("sv_bans.lua")       -- Omerta global-ban check at connect + reporting ULX/SAM bans
+include("sv_chatbridge.lua") -- COMMUNiTY: in-game chat <-> the Omerta #gknuckle room (bot API)
 
 -- Players joining a dedicated server download the addon (models, textures,
 -- sounds, the gk_style map) from its Workshop item.
