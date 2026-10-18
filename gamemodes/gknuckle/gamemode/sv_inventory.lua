@@ -122,6 +122,7 @@ function Inv.DropToWorld(ply, item, vel)
 end
 
 -- New item for this player: into the bag, or at their feet if it's too heavy.
+Inv.BAG_MAX = 200
 function Inv.Give(ply, class, data)
     if not GK.ItemDef(class) then return end
     local inv = Inv.Get(ply)
@@ -141,7 +142,14 @@ function Inv.Give(ply, class, data)
             end
         end
     end
-    -- WK's bag never refuses: carrying more only slows you down.
+    -- WK's bag never refuses: carrying more only slows you down. L3: past BAG_MAX
+    -- items the whole-bag sync would outgrow a net message, so extras land at your feet.
+    if #inv.bag >= Inv.BAG_MAX then
+        if GK.Shop and GK.Shop.SpawnItem then
+            GK.Shop.SpawnItem({ item = class, data = item.data }, ply:GetPos() + ply:GetForward() * 24 + Vector(0, 0, 20))
+        end
+        return
+    end
     table.insert(inv.bag, item)
     Inv.Sync(ply)
 end
@@ -234,11 +242,15 @@ end
 
 -- Clicking a world item with an empty hand picks it up into that hand.
 function Inv.PickupToHand(ply, ent, side)
+    -- M5: Remove() only happens at the end of the tick, so two hands (or two players)
+    -- grabbing the same item in one tick would both get it. First one wins.
+    if not IsValid(ent) or ent.GK_Taken then return false end
     local class = ent.GKItemClass
     if not class or not GK.ItemDef(class) then return false end
     if (ent.GK_NoPickupUntil or 0) > CurTime() then return false end
     local inv = Inv.Get(ply)
     if inv.slots["hand_" .. side] then return false end
+    ent.GK_Taken = true
     local item = newItem(ply, class, ent.GKItemData)
     inv.slots["hand_" .. side] = item
     ent:Remove()
@@ -292,6 +304,9 @@ net.Receive("gk_inv_move", function(_, ply)
     local target = net.ReadString()
     local x, y = net.ReadFloat(), net.ReadFloat()
     if target ~= "bag" and target ~= "world" and not SLOTS[target] then return end
+    -- L4: no throwing things out while downed, ragdolled or impaled (as for emotes).
+    if target == "world" and ((GK.IsDowned and GK.IsDowned(ply)) or (GK.IsRagdolled and GK.IsRagdolled(ply))
+        or (GK.IsImpaled and GK.IsImpaled(ply))) then return end
     -- NaN / inf would slip through math.Clamp and end up in the synced bag layout.
     if x ~= x or x == math.huge or x == -math.huge then x = 0.5 end
     if y ~= y or y == math.huge or y == -math.huge then y = 0.5 end
