@@ -155,7 +155,7 @@ local function climbed(a, p) return (a.climb and a.climb[p] or 0) >= cvMinClimb:
 hook.Add("PlayerDeath", "GK_ArenaForfeit", function(ply, _, attacker)
     local a = R.arenas[GK.ArenaOf(ply)]
     if not a then return end
-    if attacker == ply or CurTime() - (a.started or 0) < cvForfeitSecs:GetFloat() or not climbed(a, ply) then
+    if attacker == ply or CurTime() - (a.runStarted or a.started or 0) < cvForfeitSecs:GetFloat() or not climbed(a, ply) then
         a.forfeit = a.forfeit or {}
         a.forfeit[ply] = true
     end
@@ -180,7 +180,7 @@ function GK.StartArena(index, players, forced)
     local info = GK.Arena.Start(index, GK.StageRegion(1), os.time() + index)
     if not info then return end
     local mode = R.padMode[index] or R.padMode[0] or GK.DefaultRunMode()
-    local a = { index = index, teams = {}, players = {}, info = info, started = CurTime(), startedAt = os.time(), gas = nil, forced = forced, teamCount = #teams, stage = 1, mode = mode }
+    local a = { index = index, teams = {}, players = {}, info = info, started = CurTime(), runStarted = CurTime(), startedAt = os.time(), gas = nil, forced = forced, teamCount = #teams, stage = 1, mode = mode }
     SetGlobal2String("gk_arena_mode_" .. index, mode)
     R.arenas[index] = a
     for t, members in ipairs(teams) do
@@ -237,7 +237,8 @@ end)
 -- M4: is this win worth CrabCoin? Not for short runs, and a "last team standing"
 -- win only counts against at least one other real player who didn't forfeit.
 local function payable(a, winTeam, how)
-    if CurTime() - (a.started or CurTime()) < cvMinSecs:GetFloat() then return false end
+    -- R3: whole-run time (runStarted is set once); a.started restarts each region.
+    if CurTime() - (a.runStarted or a.started or CurTime()) < cvMinSecs:GetFloat() then return false end
     if how ~= "last" then return true end
     local rivals = 0
     for _, p in ipairs(a.players) do
@@ -418,7 +419,7 @@ function GK.ArenaBreak(index)
         if info then a.info = info end
         a.stage = a.stage + 1
         for _, p in ipairs(a.players) do if IsValid(p) and p.GK_Ascended then p.GK_Ascended[a] = 0 end end
-        a.started = CurTime()
+        a.started = CurTime() -- per-region (Mass grace); forfeit/min-time use a.runStarted
         a.gas = a.info.bounds and a.info.bounds.mins and a.info.bounds.mins.z or ((a.info.spawn or vector_origin).z - 200)
         local n = 0
         for _, p in ipairs(a.players) do
