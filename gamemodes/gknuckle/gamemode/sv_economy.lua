@@ -46,7 +46,7 @@ local function request(method, path, body, onDone, originOverride)
     local o = GK.ApiAuth.Origin(origin, "api")
     if not o then
         print(("[gKnuckle] %s %q is not on the allowlist (sv_apiauth.lua); request skipped"):format(label, origin))
-        return done(0, { error = "origin not allowed" })
+        return done(0, { error = "origin not allowed", not_sent = true })
     end
     -- H2 leftover: the global secret only goes out when explicitly opted in.
     if not cvLegacy:GetBool() then
@@ -55,7 +55,7 @@ local function request(method, path, body, onDone, originOverride)
             MsgC(Color(255, 80, 80), "[gKnuckle] ECONOMY OFF: gk_economy_key is not an id:secret per-server key. "
                 .. "Refusing to send a legacy global secret. Set a per-server key, or gk_economy_legacy_key 1 to send it anyway.\n")
         end
-        if onDone then onDone(false, { error = "legacy key not allowed" }, 0) end -- warned once above
+        if onDone then onDone(false, { error = "legacy key not allowed", not_sent = true }, 0) end -- warned once above
         return
     end
     if not warnedLegacy then
@@ -117,7 +117,18 @@ end
 local function saveDaily() file.CreateDir("gknuckle") file.Write(DAILY, util.TableToJSON(daily)) end
 function GK.Economy.EarnedToday(ply) return IsValid(ply) and (dailyBucket()[ply:SteamID64() or ""] or 0) or 0 end
 
+-- R4: /add isn't idempotent on prod yet, so a timeout, 5xx, redirect or anything else
+-- unclear may still have paid. Only give the daily allowance back when the award
+-- definitely didn't happen: never sent, or a 4xx answer (other than 408 timeout).
+local function definitelyNotPaid(code, data)
+    if istable(data) and data.not_sent then return true end
+    code = tonumber(code) or 0
+    return code >= 400 and code < 500 and code ~= 408
+end
+GK.Economy.DefinitelyNotPaid = definitelyNotPaid
+
 -- eventId (optional) makes a retry or double call idempotent on the API (event_id).
+-- Every award carries an event_id (a fresh unique one when the caller has no stable id).
 -- noCap: admin grants (ulx gkgive) skip the server's gameplay cap.
 function GK.Economy.Add(ply, amount, reason, eventId, noCap)
     amount = validAmount(amount)
@@ -136,8 +147,8 @@ function GK.Economy.Add(ply, amount, reason, eventId, noCap)
         event_id = eventId or GK.ApiAuth.EventId("add", ply) }, function(ok, data, code)
         if not ok then
             local b = dailyBucket()
-            if counted > 0 then
-                b[sid] = math.max(0, (b[sid] or 0) - counted) -- not paid: give the allowance back
+            if counted > 0 and definitelyNotPaid(code, data) then
+                b[sid] = math.max(0, (b[sid] or 0) - counted) -- definitely not paid: give the allowance back
                 saveDaily()
             end
             if IsValid(ply) and (code == 429 or (istable(data) and data.reason == "daily_cap")) then

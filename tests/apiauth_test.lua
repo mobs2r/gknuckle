@@ -23,6 +23,7 @@ include = function(f) dofile(root .. f) end
 AddCSLuaFile = function() end
 SERVER = true
 SysTime = os.clock
+isentity = function() return false end
 dofile(root .. "sv_apiauth.lua")
 local A, fails = GK.ApiAuth, 0
 local function check(name, ok) print((ok and "ok   " or "FAIL ") .. name) if not ok then fails = fails + 1 end end
@@ -40,4 +41,8 @@ local h = A.Headers("srv1:0123456789abcdef0123", "POST", "/api/x?y=1", '{"a":1}'
 os.time = realTime
 check("signature", h["X-GKnuckle-Signature"] == "cqPAttS5jHfHkbRuHn5LgecU272Dc8Eb9D3JNBpecD0" and h["X-GKnuckle-Key"] == "srv1")
 check("secret never in headers", not table.concat({ h["X-GKnuckle-Key"], h["X-GKnuckle-Signature"], h["X-GKnuckle-Nonce"] }):find("0123456789abcdef0123", 1, true))
+local refused
+A.Request("https://evil.example", "srv1:0123456789abcdef0123", "POST", "/api/private/add", {}, function(code, data) refused = code == 0 and data.not_sent end)
+check("local refusal marked not_sent (R4)", refused == true)
+check("event_id format (R4)", A.EventId("add", "76561199041513241"):match("^[A-Za-z0-9:._-]+$") ~= nil and #A.EventId("add", "x") <= 160)
 os.exit(fails == 0 and 0 or 1)

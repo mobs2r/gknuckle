@@ -109,19 +109,19 @@ function A.Headers(key, method, path, body)
 end
 
 -- One helper for every signed call. onDone(code, data): 0 = transport failure or refused
--- locally. Only 2xx counts as success; a 3xx (redirect) is a failure (H2).
+-- locally (refused locally = data.not_sent, the request never left the server). Only 2xx counts as success; a 3xx (redirect) is a failure (H2).
 function A.Request(origin, key, method, path, body, onDone, label, retried)
     label = label or "api"
     local o = A.Origin(origin)
     if not o then
         print(("[gKnuckle] %s: origin %q is not on the allowlist (sv_apiauth.lua); request skipped"):format(label, tostring(origin)))
-        return onDone and onDone(0, { error = "origin not allowed" })
+        return onDone and onDone(0, { error = "origin not allowed", not_sent = true })
     end
     local raw = body and util.TableToJSON(body) or ""
     local headers = A.Headers(key, method, path, raw)
     if not headers then
         print(("[gKnuckle] %s: %s; request skipped"):format(label, A.Disabled and "signing disabled (self-test failed)" or "key must be id:secret"))
-        return onDone and onDone(0, { error = "cannot sign" })
+        return onDone and onDone(0, { error = "cannot sign", not_sent = true })
     end
     HTTP({
         url = o .. path, method = method, headers = headers, timeout = 15,
