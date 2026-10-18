@@ -19,7 +19,7 @@ end
 
 -- The API key travels in a header: only ever send it over HTTPS.
 local function secureOrigin(url)
-    return string.StartWith(string.lower(url or ""), "https://")
+    return string.StartsWith(string.lower(url or ""), "https://")
 end
 
 local function request(method, path, body, onDone)

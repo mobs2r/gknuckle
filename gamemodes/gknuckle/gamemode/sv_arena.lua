@@ -131,6 +131,8 @@ end
 
 -- The pause menu's LEAVE RUN (WK's End Run): you die where you are, and the
 -- run carries on for anyone else in it.
+util.AddNetworkString("gk_ascended") -- WK's 50 m chime (was SendLua)
+
 concommand.Add("gk_leaverun", function(ply)
     if not IsValid(ply) or not ply:Alive() then return end
     if not R.arenas[GK.ArenaOf(ply)] then return end
@@ -544,7 +546,7 @@ timer.Create("GK_Rounds", 0.25, 0, function()
                     p.GK_Ascended = p.GK_Ascended or {}
                     if m > (p.GK_Ascended[a] or 0) then
                         p.GK_Ascended[a] = m
-                        p:SendLua("surface.PlaySound('gknuckle/ui/ascended.ogg')")
+                        net.Start("gk_ascended") net.Send(p)
                     end
                 end
                 teamsAlive[a.teams[p]] = true

@@ -65,7 +65,7 @@ GK.Pack.HMAC = hmacSha256 -- exposed for a self-check against a known vector
 
 local function request(path, body, onDone)
     local origin = cvApi:GetString()
-    if not string.StartWith(string.lower(origin), "https://") then
+    if not string.StartsWith(string.lower(origin), "https://") then
         print("[gKnuckle] gk_pack_api must start with https://; request skipped")
         return onDone(false, 0, {})
     end
@@ -118,7 +118,7 @@ local function parseFile(e, serverTime)
     local url, sha = tostring(e.url or ""), string.lower(tostring(e.sha256 or ""))
     local bytes, cs = tonumber(e.bytes), tonumber(e.chunk_size)
     local chunks = istable(e.chunk_sha256) and e.chunk_sha256 or {}
-    if not string.StartWith(url, "https://") or #sha ~= 64 or not string.match(sha, HEX64) then return nil end
+    if not string.StartsWith(url, "https://") or #sha ~= 64 or not string.match(sha, HEX64) then return nil end
     if not bytes or bytes <= 0 or not cs or cs < 1048576 or cs > 33554432 then return nil end
     if #chunks ~= math.ceil(bytes / cs) or #chunks > GK.Pack.MAX_CHUNKS then return nil end
     for i, h in ipairs(chunks) do

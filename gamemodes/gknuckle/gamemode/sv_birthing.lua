@@ -42,6 +42,7 @@ function B.Drop()
     local pos = at:GetPos() + VectorRand() * 8
     if math.random() < 0.65 then
         local j = ents.Create("gk_trash")
+        if not IsValid(j) then return end
         j:SetModel(JUNK[math.random(#JUNK)])
         j:SetPos(pos)
         j.GK_Harmless = true -- falls into the pool, hurts nobody
@@ -51,6 +52,7 @@ function B.Drop()
         local class = ITEMS[math.random(#ITEMS)]
         if not GK.ItemDef(class) then return end
         local it = ents.Create("gk_item")
+        if not IsValid(it) then return end
         it.GKItemClass = class
         it:SetPos(pos)
         it:Spawn()

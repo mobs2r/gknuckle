@@ -59,6 +59,7 @@ if SERVER then
 end
 
 if CLIENT then
+    net.Receive("gk_ascended", function() surface.PlaySound("gknuckle/ui/ascended.ogg") end)
     net.Receive("gk_announce", function()
         local path = net.ReadString()
         -- A PA chime first, then the voice, a touch quieter than the world.

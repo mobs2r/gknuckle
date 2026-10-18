@@ -1,3 +1,4 @@
+local CEILBASE, R0 -- shared between the steps below (were accidental globals)
 -- Creature test: bloodbug, turret, gas bag, a roach under a ceiling, and the
 -- god ray stare. Only runs when data/gknuckle/creaturetest.txt exists.
 -- Logs "[GKCRIT]" lines and takes screenshots.

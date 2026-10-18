@@ -95,7 +95,7 @@ step(0, function()
     local row = 0
     for _, e in ipairs(ents.FindByClass("gk_item")) do if e.GK_Starter then row = row + 1 e:Remove() end end
     log("starter item row", row)
-    log("map", game.GetMap(), "model", tostring(util.IsValidModel("models/gknuckle/items/rebar.mdl")), "pvp", GetConVarString("sbox_playershouldtakedamage"), "god", GetConVarString("sbox_godmode"))
+    log("map", game.GetMap(), "model", tostring(util.IsValidModel("models/gknuckle/items/rebar.mdl")), "pvp", GetConVar("sbox_playershouldtakedamage") and GetConVar("sbox_playershouldtakedamage"):GetString(), "god", GetConVar("sbox_godmode") and GetConVar("sbox_godmode"):GetString())
     local tr = util.TraceLine({ start = P:GetPos() + Vector(0, 0, 10), endpos = P:GetPos() - Vector(0, 0, 200), filter = P })
     ground = tr.HitPos
     home = P:GetPos()

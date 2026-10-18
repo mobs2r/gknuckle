@@ -47,7 +47,7 @@ local function mount(idx, early)
         for name, data in pairs(P.fonts) do P.rawCreateFont(name, data) end
         for _, e in ipairs(ents.GetAll()) do
             local m = IsValid(e) and e.GetModel and e:GetModel()
-            if m and string.StartWith(m, "models/gknuckle/") then e:SetModel(m) end
+            if m and string.StartsWith(m, "models/gknuckle/") then e:SetModel(m) end
         end
         hook.Run("GK_PackMounted", files)
         chat.AddText(Color(120, 200, 255), "[gKnuckle] ", color_white,

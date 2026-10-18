@@ -61,7 +61,7 @@ if CLIENT then
     -- Outline it when developer mode is on, to check placement.
     function ENT:Draw() end
     hook.Add("PostDrawTranslucentRenderables", "GK_LadderDebug", function(depth, sky)
-        if depth or sky or GetConVarNumber("developer") < 1 then return end
+        if depth or sky or GetConVar("developer"):GetInt() < 1 then return end
         for _, l in ipairs(ents.FindByClass("gk_ladder")) do
             local w, h = l:GetWidth() / 2, l:GetHeight()
             render.DrawWireframeBox(l:GetPos(), l:GetAngles(), Vector(0, -w, 0), Vector(l.GKDepth, w, h), Color(255, 120, 40), true)

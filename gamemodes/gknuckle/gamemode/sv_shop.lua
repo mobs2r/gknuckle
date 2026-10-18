@@ -18,7 +18,9 @@ function GK.Shop.SpawnItem(slot, pos, ang)
         ent = ents.Create(slot.entity)
     else
         local def = GK.ItemDef(slot.item)
+        if not def then return end -- shop slot names an item that isn't registered
         ent = ents.Create(def.worldClass or "gk_item")
+        if not IsValid(ent) then return end
         ent.GKItemClass = slot.item
         ent.GKItemData = slot.data and table.Copy(slot.data) or (def.newData and def.newData()) or {}
         if ent.SetItemClass then ent:SetItemClass(slot.item) end
@@ -51,7 +53,7 @@ concommand.Add("gk_buy", function(ply, _, args)
     if not slot or (ply.GK_NextBuy or 0) > CurTime() then return end
     ply.GK_NextBuy = CurTime() + 1
     GK.Shop.Charge(ply, slot, function(ok)
-        if not ok or not ply:Alive() then return end
+        if not ok or not IsValid(ply) or not ply:Alive() then return end
         if slot.entity then
             GK.Shop.SpawnItem(slot, ply:GetPos() + Vector(0, 0, 20))
         else

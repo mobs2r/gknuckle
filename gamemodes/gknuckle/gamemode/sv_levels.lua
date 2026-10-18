@@ -386,7 +386,7 @@ function GK.FindSafeSpot(ply, near)
 end
 
 hook.Add("PlayerSpawn", "GK_WKSafeSpawn", function(ply)
-    if not string.StartWith(game.GetMap(), "gk_wk_") then return end
+    if not string.StartsWith(game.GetMap(), "gk_wk_") then return end
     timer.Simple(0.1, function()
         if not IsValid(ply) or not ply:Alive() or ply.GK_SpawnFixed == CurTime() then return end
         local spot = GK.FindSafeSpot(ply, ply:GetPos())

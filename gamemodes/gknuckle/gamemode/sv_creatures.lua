@@ -219,8 +219,15 @@ end)
 -- Admin: gk_spawn_creature <class> puts one where you're looking.
 concommand.Add("gk_spawn_creature", function(ply, _, args)
     if not IsValid(ply) or not ply:IsAdmin() then return end
+    -- Only gKnuckle's own scripted entities: an arbitrary class here could be
+    -- lua_run / point_servercommand, which would give any admin server-side Lua.
+    local class = string.lower(args[1] or "gk_bloodbug")
+    if not string.match(class, "^gk_[%w_]+$") or not scripted_ents.GetStored(class) then
+        ply:ChatPrint("[gKnuckle] gk_spawn_creature: unknown gKnuckle entity '" .. class .. "'")
+        return
+    end
     local tr = ply:GetEyeTrace()
-    local e = ents.Create(args[1] or "gk_bloodbug")
+    local e = ents.Create(class)
     if not IsValid(e) then return end
     e:SetPos(tr.HitPos + tr.HitNormal * 40)
     e:SetAngles(Angle(0, ply:EyeAngles().y + 180, 0))

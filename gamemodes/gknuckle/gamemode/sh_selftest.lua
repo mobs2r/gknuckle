@@ -901,7 +901,7 @@ if game.GetMap() == "gk_style" and not focusText then
 end
 
 -- On a compiled gk_wk_ map: check spawn, collision pieces, items, finish.
-if string.StartWith(game.GetMap(), "gk_wk_") then
+if string.StartsWith(game.GetMap(), "gk_wk_") then
     steps = {}
     step(0, function()
         P = player.GetHumans()[1]

@@ -218,7 +218,7 @@ if FILTER == "func" then
         timer.Simple(1, function()
             local L = GK.Husk.FPLegsEntity and GK.Husk.FPLegsEntity()
             if not IsValid(L) then
-                print("[GKHUSK] FUNC fplegs: none", "cvar", GetConVarNumber("gk_husk_fplegs"), "alive", me:Alive(), "veh", me:InVehicle(),
+                print("[GKHUSK] FUNC fplegs: none", "cvar", (GetConVar("gk_husk_fplegs") and GetConVar("gk_husk_fplegs"):GetFloat()), "alive", me:Alive(), "veh", me:InVehicle(),
                     "viewent", GetViewEntity(), "legless", me:GetNW2Bool("gk_legless", false), "ragdolled", GK.IsRagdolled and GK.IsRagdolled(me),
                     "hooked", hook.GetTable().PostDrawOpaqueRenderables and hook.GetTable().PostDrawOpaqueRenderables.GK_HuskFPLegs ~= nil)
                 return

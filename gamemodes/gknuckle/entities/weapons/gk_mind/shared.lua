@@ -34,7 +34,7 @@ SWEP.Secondary.Ammo = "none"
 
 local C = GK.Config
 
-HAND_IDLE, HAND_GRIP, HAND_HOLD = 0, 1, 2
+local HAND_IDLE, HAND_GRIP, HAND_HOLD = 0, 1, 2
 
 -- Which mouse button drives which hand. A hand holding an item uses it instead.
 local BUTTONS = { l = IN_ATTACK, r = IN_ATTACK2 }
