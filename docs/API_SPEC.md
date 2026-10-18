@@ -144,13 +144,13 @@ token = base64url_nopad(SHA256_raw(BUNNY_TOKEN_AUTH_KEY + token_path + expires [
 
 | Var | Meaning |
 |---|---|
-| `GKNUCKLE_ASSET_CDN_ORIGIN` | `https://<pullzone>.b-cdn.net` |
-| `GKNUCKLE_ASSET_RELEASE` | `gKnuckle/ver0.5.0` |
+| `GK_ASSET_CDN_ORIGIN` | `https://<pullzone>.b-cdn.net` |
+| `GK_ASSET_RELEASE` | `gKnuckle/ver0.5.0` |
 | `BUNNY_TOKEN_AUTH_KEY` | pull zone token key |
 | `BUNNY_TOKEN_TTL` | default 60, max 60 |
 | `BUNNY_TOKEN_IP` | `0`/`1` |
 | `STEAM_API_KEY` | GetOwnedGames (already on Railway) |
-| `GKNUCKLE_LINK_URL` | `https://gk.style/link` |
+| `GK_LINK_URL` | `https://gk.style/link` |
 
 Server keys live in `gknuckle.server_keys`, not in env.
 
