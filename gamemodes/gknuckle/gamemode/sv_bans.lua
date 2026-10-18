@@ -28,7 +28,9 @@ end
 local function enabled() return cvApi:GetString() ~= "" and key() ~= "" end
 local function isSid(s) return isstring(s) and string.match(s, "^7656119%d%d%d%d%d%d%d%d%d%d$") ~= nil end
 
-local cache = {}   -- sid -> { banned, reason, untilTs, expires }
+-- Keyed on "sid|owner" (N1): an answer for the bare account never satisfies a lookup that
+-- also carries a family-share owner, and the owner is checked as its own account too.
+local cache = {}   -- "sid|owner" -> { banned, reason, untilTs, expires }
 local asking = {}  -- sid -> true while a check is in flight
 local waiters = {} -- sid -> { fn, ... }
 
@@ -40,27 +42,29 @@ B.Message = banMessage
 
 -- cb(entry or nil): nil = couldn't find out.
 function B.Lookup(sid, owner, cb)
-    local c = cache[sid]
+    if not (isSid(owner) and owner ~= sid) then owner = nil end
+    local ck = sid .. "|" .. (owner or "")
+    local c = cache[ck]
     if c and c.expires > CurTime() then return cb and cb(c) end
-    if cb then waiters[sid] = waiters[sid] or {} table.insert(waiters[sid], cb) end
-    if asking[sid] then return end
-    asking[sid] = true
+    if cb then waiters[ck] = waiters[ck] or {} table.insert(waiters[ck], cb) end
+    if asking[ck] then return end
+    asking[ck] = true
     local body = { steam_id = sid }
-    if isSid(owner) and owner ~= sid then body.owner_steam_id = owner end -- family-shared alts
+    if owner then body.owner_steam_id = owner end -- family-shared alts
     GK.ApiAuth.Request(cvApi:GetString(), key(), "POST", "/api/integrations/gknuckle/bans/check", body, function(code, data)
-        asking[sid] = nil
+        asking[ck] = nil
         local entry
         if code == 200 and isbool(data.banned) then
             local untilTs = tonumber(data["until"]) or 0
             entry = { banned = data.banned, reason = string.sub(tostring(data.reason or ""), 1, 160), untilTs = untilTs,
                 expires = CurTime() + (data.banned and 300 or cvClean:GetFloat()) }
             if entry.banned and untilTs > 0 and untilTs < os.time() then entry.banned = false end
-            cache[sid] = entry
+            cache[ck] = entry
         elseif code == 401 then
             print("[gKnuckle] ban API rejected the key (401): check gk_bans_key")
         end
-        local list = waiters[sid] or {}
-        waiters[sid] = nil
+        local list = waiters[ck] or {}
+        waiters[ck] = nil
         for _, fn in ipairs(list) do fn(entry) end
     end, "gk_bans_api")
 end
@@ -75,7 +79,7 @@ end
 -- Connect time. Never returns true (that would skip the server password).
 hook.Add("CheckPassword", "GK_Bans", function(sid64)
     if not enabled() or not isSid(sid64) then return end
-    local c = cache[sid64]
+    local c = cache[sid64 .. "|"]
     if c and c.expires > CurTime() then
         if c.banned then return false, banMessage(c) end
         return
@@ -93,10 +97,15 @@ end)
 hook.Add("PlayerAuthed", "GK_Bans", function(ply)
     if not enabled() or not IsValid(ply) or ply:IsBot() then return end
     local sid, owner = ply:SteamID64(), ply.OwnerSteamID64 and ply:OwnerSteamID64() or nil
-    B.Lookup(sid, owner, function(entry)
+    if not (isSid(owner) and owner ~= sid) then owner = nil end
+    local function handle(entry)
         if entry then return kickIfBanned(ply, entry) end
         if cvFail:GetString() == "closed" and IsValid(ply) then ply:Kick("Couldn't check your Omerta account. Please reconnect.") end
-    end)
+    end
+    B.Lookup(sid, owner, handle)
+    -- N1: a family-shared licence's owner is checked as an account of its own as well,
+    -- so the alt of a banned owner is kicked even if the API ignores owner_steam_id.
+    if owner then B.Lookup(owner, nil, handle) end
 end)
 
 -- Reporting in-game bans ---------------------------------------------------------
@@ -136,7 +145,10 @@ function B.Report(action, steamid, minutes, reason, admin, source)
     })
     if #outbox > 200 then table.remove(outbox, 1) end
     saveOutbox()
-    cache[sid] = nil
+    for k in pairs(cache) do -- forget every answer involving this account, as player or owner
+        local s, o = string.match(k, "^(%d*)|(%d*)$")
+        if s == sid or o == sid then cache[k] = nil end
+    end
     pump()
 end
 
