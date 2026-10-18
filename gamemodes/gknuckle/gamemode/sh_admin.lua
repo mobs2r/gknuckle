@@ -47,7 +47,7 @@ local function roleGrants(role, priv)
 end
 
 if SERVER then
-    local cvOwners = CreateConVar("gk_owner_steamids", "", { FCVAR_ARCHIVE, FCVAR_PROTECTED },
+    local cvOwners = CreateConVar("gk_owner_steamids", "", { FCVAR_PROTECTED },
         "SteamID64s (comma-separated) with full gKnuckle owner access")
     local cvRoles = CreateConVar("gk_access_roles", "1", { FCVAR_ARCHIVE }, "Ask Omerta /api/private/access-role for owner/admin/moderator roles")
     local owners, ownersRaw = {}, nil
