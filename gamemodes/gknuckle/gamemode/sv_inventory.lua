@@ -282,10 +282,19 @@ function Inv.DropHand(ply, only)
 end
 
 net.Receive("gk_inv_move", function(_, ply)
+    if not IsValid(ply) or not ply:Alive() then return end
+    -- Each move answers with a full inventory sync: cap how often a client can ask.
+    local now = CurTime()
+    if (ply.GK_InvMoveWindow or 0) < now then ply.GK_InvMoveWindow, ply.GK_InvMoves = now + 1, 0 end
+    ply.GK_InvMoves = (ply.GK_InvMoves or 0) + 1
+    if ply.GK_InvMoves > 30 then return end
     local id = net.ReadUInt(16)
     local target = net.ReadString()
     local x, y = net.ReadFloat(), net.ReadFloat()
     if target ~= "bag" and target ~= "world" and not SLOTS[target] then return end
+    -- NaN / inf would slip through math.Clamp and end up in the synced bag layout.
+    if x ~= x or x == math.huge or x == -math.huge then x = 0.5 end
+    if y ~= y or y == math.huge or y == -math.huge then y = 0.5 end
     Inv.Move(ply, id, target, x, y)
 end)
 
