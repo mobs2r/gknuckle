@@ -2,7 +2,8 @@
 // Keys are secrets: keep this file's real copy out of git and off the Workshop.
 
 // Owner tier: every gKnuckle admin privilege (comma-separated SteamID64s). Empty = none.
-gk_owner_steamids "76561199041513241"
+// Put your own SteamID64(s) here, e.g. gk_owner_steamids "7656119XXXXXXXXXX,7656119YYYYYYYYYY"
+gk_owner_steamids ""
 
 // Omerta roles (owner/admin/moderator) via GET /api/private/access-role (needs an id:secret key)
 gk_access_roles 1
