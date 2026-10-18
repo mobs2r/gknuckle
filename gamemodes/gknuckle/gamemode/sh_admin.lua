@@ -23,12 +23,6 @@ for _, p in ipairs(GK.Privileges) do
     CAMI.RegisterPrivilege(p)
 end
 
-local function fallback(ply, min)
-    if min == "user" then return true end
-    if min == "superadmin" then return ply:IsSuperAdmin() end
-    return ply:IsAdmin()
-end
-
 -- Synchronous answer for a privilege. The console always has access. Admin mods that
 -- answer CAMI synchronously (ULX, SAM, plain fallback) are used directly; one that only
 -- answers asynchronously gets an async query, and until it replies the cached answer
