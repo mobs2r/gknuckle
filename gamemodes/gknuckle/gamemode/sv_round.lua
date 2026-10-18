@@ -5,6 +5,8 @@
 
 local cvRoundTime = CreateConVar("gk_round_time", "300", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Course round length in seconds")
 local cvReward = CreateConVar("gk_finish_reward", "25", FCVAR_ARCHIVE + FCVAR_NOTIFY, "CrabCoin for finishing first")
+local cvCooldown = CreateConVar("gk_finish_reward_cooldown", "1800", FCVAR_ARCHIVE, "Seconds before the same player can be paid for a course win again")
+local paidAt = {} -- SteamID64 -> os.time() of their last course payout (survives rejoin)
 
 GK.Round = GK.Round or { finishers = {} }
 
@@ -73,8 +75,13 @@ function GK.Round.Finish(ply)
     end
     PrintMessage(HUD_PRINTTALK, ("[gKnuckle] %s finished #%d in %s%s"):format(
         ply:Nick(), place, string.FormattedTime(time, "%02i:%02i.%02i"), note))
-    if place == 1 then
-        GK.Economy.Add(ply, cvReward:GetInt(), "gknuckle_course_win")
+    -- M4: first place pays only with another real player on the server, once per
+    -- cooldown per player, and once per round (event id).
+    local sid = ply:SteamID64() or ""
+    if place == 1 and #player.GetHumans() >= 2 and os.time() - (paidAt[sid] or 0) >= cvCooldown:GetInt() then
+        paidAt[sid] = os.time()
+        GK.Economy.Add(ply, cvReward:GetInt(), "gknuckle_course_win",
+            GK.ApiAuth.EventId("course_win", ply, game.GetMap() .. ":" .. math.floor(GetGlobal2Float("gk_round_start", 0))))
     end
     if place >= #player.GetAll() then GK.Round.End("everyone made it") end
 end

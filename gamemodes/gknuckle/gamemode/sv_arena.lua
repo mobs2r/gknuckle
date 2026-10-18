@@ -29,6 +29,7 @@ local cvRegions = CreateConVar("gk_run_regions", "3", FCVAR_ARCHIVE, "Regions pe
 local cvBreak = CreateConVar("gk_break_time", "30", FCVAR_ARCHIVE, "Seconds in the break room between regions")
 local cvRise = CreateConVar("gk_tube_rise", "1", FCVAR_ARCHIVE, "Ride up the staging tube before arriving in a run")
 local cvReward = CreateConVar("gk_arena_reward", "25", FCVAR_ARCHIVE, "CrabCoin for each player on the winning team")
+local cvMinSecs = CreateConVar("gk_arena_reward_min_secs", "90", FCVAR_ARCHIVE, "Runs shorter than this pay no CrabCoin")
 
 GK.Rounds = GK.Rounds or { arenas = {}, forceUntil = 0 }
 local R = GK.Rounds
@@ -135,8 +136,17 @@ util.AddNetworkString("gk_ascended") -- WK's 50 m chime (was SendLua)
 
 concommand.Add("gk_leaverun", function(ply)
     if not IsValid(ply) or not ply:Alive() then return end
-    if not R.arenas[GK.ArenaOf(ply)] then return end
+    local a = R.arenas[GK.ArenaOf(ply)]
+    if not a then return end
+    a.forfeit = a.forfeit or {}
+    a.forfeit[ply] = true -- M4: leaving hands nobody a "last team standing" payout
     ply:Kill()
+end)
+-- M4: a console "kill" (attacker = self) mid-run counts as a forfeit too.
+hook.Add("PlayerDeath", "GK_ArenaForfeit", function(ply, _, attacker)
+    if attacker ~= ply then return end
+    local a = R.arenas[GK.ArenaOf(ply)]
+    if a then a.forfeit = a.forfeit or {} a.forfeit[ply] = true end
 end)
 
 -- WK's campaign goes Silos -> Pipeworks -> Habitation, a break room between
@@ -158,7 +168,7 @@ function GK.StartArena(index, players, forced)
     local info = GK.Arena.Start(index, GK.StageRegion(1), os.time() + index)
     if not info then return end
     local mode = R.padMode[index] or R.padMode[0] or GK.DefaultRunMode()
-    local a = { index = index, teams = {}, players = {}, info = info, started = CurTime(), gas = nil, forced = forced, teamCount = #teams, stage = 1, mode = mode }
+    local a = { index = index, teams = {}, players = {}, info = info, started = CurTime(), startedAt = os.time(), gas = nil, forced = forced, teamCount = #teams, stage = 1, mode = mode }
     SetGlobal2String("gk_arena_mode_" .. index, mode)
     R.arenas[index] = a
     for t, members in ipairs(teams) do
@@ -212,15 +222,33 @@ hook.Add("Tick", "GK_TubeRise", function()
     end
 end)
 
-function GK.EndArena(index, winTeam)
+-- M4: is this win worth CrabCoin? Not for short runs, and a "last team standing"
+-- win only counts against at least one other real player who didn't forfeit.
+local function payable(a, winTeam, how)
+    if CurTime() - (a.started or CurTime()) < cvMinSecs:GetFloat() then return false end
+    if how ~= "last" then return true end
+    local rivals = 0
+    for _, p in ipairs(a.players) do
+        if IsValid(p) and not p:IsBot() and a.teams[p] ~= winTeam and not (a.forfeit and a.forfeit[p]) then rivals = rivals + 1 end
+    end
+    return rivals >= 1
+end
+
+-- how: "top" (reached the top of the last region), "last" (last team standing) or nil.
+function GK.EndArena(index, winTeam, how)
     local a = R.arenas[index]
     if not a then return end
     R.arenas[index] = nil
     local winners = {}
+    local pay = winTeam ~= nil and payable(a, winTeam, how)
     for _, p in ipairs(a.players) do
         if IsValid(p) and a.teams[p] == winTeam then
             winners[#winners + 1] = p
-            GK.Economy.Add(p, cvReward:GetInt(), "gknuckle_arena_win")
+            if pay then
+                -- One payout per player per run, even if this is ever called twice.
+                GK.Economy.Add(p, cvReward:GetInt(), "gknuckle_arena_win",
+                    GK.ApiAuth.EventId("arena_win", p, index .. ":" .. (a.startedAt or 0)))
+            end
             p:EmitSound("ambient/levels/citadel/portal_beam_shoot" .. math.random(1, 6) .. ".wav", 70)
         end
     end
@@ -554,7 +582,7 @@ timer.Create("GK_Rounds", 0.25, 0, function()
                     if (a.stage or 1) < cvRegions:GetInt() then
                         GK.TeamToBreak(index, a.teams[p]) -- this squad made it through: rest
                     else
-                        GK.EndArena(index, a.teams[p]) -- top of the last region: that team wins
+                        GK.EndArena(index, a.teams[p], "top") -- top of the last region: that team wins
                         return
                     end
                 end
@@ -567,7 +595,7 @@ timer.Create("GK_Rounds", 0.25, 0, function()
         elseif alive == 0 then
             GK.EndArena(index, nil)
         elseif table.Count(teamsAlive) == 1 and a.teamCount > 1 then
-            GK.EndArena(index, next(teamsAlive)) -- last team standing (a solo run goes on to the top)
+            GK.EndArena(index, next(teamsAlive), "last") -- last team standing (a solo run goes on to the top)
         end
     end
 end)
