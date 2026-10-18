@@ -1,0 +1,13 @@
+{
+	"title": "gKnuckle",
+	"type": "gamemode",
+	"tags": [ "fun", "movement" ],
+	"ignore": [
+		"*.md",
+		"*.psd",
+		"*.gma",
+		".git/*",
+		".gitignore",
+		"tools/*"
+	]
+}

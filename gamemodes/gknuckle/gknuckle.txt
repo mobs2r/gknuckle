@@ -1,0 +1,29 @@
+"gknuckle"
+{
+	"base"		"sandbox"
+	"title"		"gKnuckle"
+	"category"	"other"
+	"maps"		"^gk_"
+	"menusystem"	"1"
+	"workshopid"	"3479529954"
+
+	"settings"
+	{
+		1
+		{
+			"name"		"gk_round_time"
+			"text"		"Round time (seconds)"
+			"help"		"How long a course round lasts"
+			"type"		"Numeric"
+			"default"	"300"
+		}
+		2
+		{
+			"name"		"gk_finish_reward"
+			"text"		"CrabCoin reward for finishing first"
+			"help"		"Paid through the omerta economy when it is configured"
+			"type"		"Numeric"
+			"default"	"25"
+		}
+	}
+}

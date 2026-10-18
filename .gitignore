@@ -1,0 +1,21 @@
+# Ripped / binary game assets are distributed via the Steam Workshop addon, never committed.
+*.mdl
+*.vtx
+*.vvd
+*.phy
+*.vtf
+*.vmt
+*.wav
+*.mp3
+*.ogg
+*.bsp
+*.gma
+models/
+materials/
+sound/
+
+# Converted White Knuckle level data, fonts and other resources ship only in the Workshop addon.
+data_static/
+resource/
+*.ttf
+*.png
