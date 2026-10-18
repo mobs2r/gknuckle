@@ -11,7 +11,7 @@ local function register()
         if not GK.HasAccess(calling, "gknuckle.economy_admin") then return ULib.tsayError(calling, "You need gknuckle.economy_admin", true) end
         reason = string.sub(reason ~= "" and reason or "admin_grant", 1, 60)
         for _, t in ipairs(targets) do
-            GK.Economy.Add(t, amount, "gknuckle_admin:" .. reason, GK.ApiAuth.EventId("ulx_give", t))
+            GK.Economy.Add(t, amount, "gknuckle_admin:" .. reason, GK.ApiAuth.EventId("ulx_give", t), true)
         end
         ulx.fancyLogAdmin(calling, "#A gave #T #s CrabCoin (#s)", targets, amount, reason)
     end, "!gkgive")

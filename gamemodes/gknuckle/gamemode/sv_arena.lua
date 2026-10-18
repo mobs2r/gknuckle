@@ -30,6 +30,13 @@ local cvBreak = CreateConVar("gk_break_time", "30", FCVAR_ARCHIVE, "Seconds in t
 local cvRise = CreateConVar("gk_tube_rise", "1", FCVAR_ARCHIVE, "Ride up the staging tube before arriving in a run")
 local cvReward = CreateConVar("gk_arena_reward", "25", FCVAR_ARCHIVE, "CrabCoin for each player on the winning team")
 local cvMinSecs = CreateConVar("gk_arena_reward_min_secs", "90", FCVAR_ARCHIVE, "Runs shorter than this pay no CrabCoin")
+-- N5: alt farming. Any death (whatever killed you) this early, or before climbing this
+-- far, is a forfeit; a "last standing" rival must have climbed this far too; and each
+-- SteamID is paid at most once per cooldown (plus gk_economy_daily_cap in sv_economy.lua).
+local cvForfeitSecs = CreateConVar("gk_arena_forfeit_secs", "120", FCVAR_ARCHIVE, "Deaths within this many seconds of the start count as a forfeit")
+local cvMinClimb = CreateConVar("gk_arena_min_climb", "16", FCVAR_ARCHIVE, "Metres a player must climb before their death isn't a forfeit (and to count as a rival)")
+local cvCooldown = CreateConVar("gk_arena_reward_cooldown", "600", FCVAR_ARCHIVE, "Seconds between arena payouts for one SteamID")
+local paidAt = {} -- SteamID64 -> os.time() of the last arena payout
 
 GK.Rounds = GK.Rounds or { arenas = {}, forceUntil = 0 }
 local R = GK.Rounds
@@ -142,11 +149,16 @@ concommand.Add("gk_leaverun", function(ply)
     a.forfeit[ply] = true -- M4: leaving hands nobody a "last team standing" payout
     ply:Kill()
 end)
--- M4: a console "kill" (attacker = self) mid-run counts as a forfeit too.
+-- M4/N5: a self-kill, or any death (another player, the Mass, gas, a hazard) early in
+-- the run or before climbing gk_arena_min_climb, counts as a forfeit.
+local function climbed(a, p) return (a.climb and a.climb[p] or 0) >= cvMinClimb:GetFloat() * 39.37 end
 hook.Add("PlayerDeath", "GK_ArenaForfeit", function(ply, _, attacker)
-    if attacker ~= ply then return end
     local a = R.arenas[GK.ArenaOf(ply)]
-    if a then a.forfeit = a.forfeit or {} a.forfeit[ply] = true end
+    if not a then return end
+    if attacker == ply or CurTime() - (a.started or 0) < cvForfeitSecs:GetFloat() or not climbed(a, ply) then
+        a.forfeit = a.forfeit or {}
+        a.forfeit[ply] = true
+    end
 end)
 
 -- WK's campaign goes Silos -> Pipeworks -> Habitation, a break room between
@@ -229,7 +241,7 @@ local function payable(a, winTeam, how)
     if how ~= "last" then return true end
     local rivals = 0
     for _, p in ipairs(a.players) do
-        if IsValid(p) and not p:IsBot() and a.teams[p] ~= winTeam and not (a.forfeit and a.forfeit[p]) then rivals = rivals + 1 end
+        if IsValid(p) and not p:IsBot() and a.teams[p] ~= winTeam and not (a.forfeit and a.forfeit[p]) and climbed(a, p) then rivals = rivals + 1 end
     end
     return rivals >= 1
 end
@@ -244,7 +256,9 @@ function GK.EndArena(index, winTeam, how)
     for _, p in ipairs(a.players) do
         if IsValid(p) and a.teams[p] == winTeam then
             winners[#winners + 1] = p
-            if pay then
+            local sid = p:SteamID64() or ""
+            if pay and not p:IsBot() and os.time() - (paidAt[sid] or 0) >= cvCooldown:GetInt() then
+                paidAt[sid] = os.time()
                 -- One payout per player per run, even if this is ever called twice.
                 GK.Economy.Add(p, cvReward:GetInt(), "gknuckle_arena_win",
                     GK.ApiAuth.EventId("arena_win", p, index .. ":" .. (a.startedAt or 0)))
@@ -521,6 +535,16 @@ end)
 timer.Create("GK_Rounds", 0.25, 0, function()
     for index, a in pairs(R.arenas) do
         local info = a.info
+        -- N5: how high each player has got this run (above the current region's spawn).
+        if info.spawn then
+            a.climb = a.climb or {}
+            for _, p in ipairs(a.players) do
+                if IsValid(p) and p:Alive() and GK.ArenaOf(p) == index then
+                    local h = p:GetPos().z - info.spawn.z
+                    if h > (a.climb[p] or 0) then a.climb[p] = h end
+                end
+            end
+        end
         -- Start the Mass: someone not resting is 16 m up, or the grace ran out.
         if not a.massAt and not a.inBreak and info.spawn then
             local start = CurTime() - a.started >= cvGrace:GetFloat()

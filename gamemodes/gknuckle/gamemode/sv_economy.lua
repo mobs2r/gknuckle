@@ -102,13 +102,50 @@ local function validAmount(n, max)
 end
 GK.Economy.ValidAmount = validAmount
 
+-- N5: a server-side daily cap on CrabCoin rewards per SteamID (all reasons together),
+-- kept in data/ so a restart doesn't reset it. The API's own per-key/per-steam_id cap
+-- (API_SPEC §8) still applies on top; a 429 or reason "daily_cap" from it is honoured.
+local cvDaily = CreateConVar("gk_economy_daily_cap", "300", { FCVAR_ARCHIVE }, "Most CrabCoin one SteamID can earn from gameplay per day (0 = no server cap)", 0, 100000)
+local DAILY = "gknuckle/economy_daily.json"
+local daily = util.JSONToTable(file.Read(DAILY, "DATA") or "") or {}
+local function dailyBucket()
+    local today = os.date("!%Y%m%d")
+    if daily.d ~= today then daily = { d = today, n = {} } end
+    daily.n = istable(daily.n) and daily.n or {}
+    return daily.n
+end
+local function saveDaily() file.CreateDir("gknuckle") file.Write(DAILY, util.TableToJSON(daily)) end
+function GK.Economy.EarnedToday(ply) return IsValid(ply) and (dailyBucket()[ply:SteamID64() or ""] or 0) or 0 end
+
 -- eventId (optional) makes a retry or double call idempotent on the API (event_id).
-function GK.Economy.Add(ply, amount, reason, eventId)
+-- noCap: admin grants (ulx gkgive) skip the server's gameplay cap.
+function GK.Economy.Add(ply, amount, reason, eventId, noCap)
     amount = validAmount(amount)
-    if not IsValid(ply) or ply:IsBot() or not amount then return end
-    request("POST", "/api/private/add", { steam_id = ply:SteamID64(), amount = amount, reason = reason,
-        event_id = eventId or GK.ApiAuth.EventId("add", ply) }, function(ok, data)
-        if ok and IsValid(ply) then
+    if not IsValid(ply) or ply:IsBot() or not amount or not enabled() then return end
+    local sid, n = ply:SteamID64(), dailyBucket()
+    local cap = cvDaily:GetInt()
+    if noCap then cap = 0 end
+    if cap > 0 and (n[sid] or 0) + amount > cap then
+        ply:ChatPrint("[gKnuckle] You've hit today's CrabCoin limit on this server. Come back tomorrow.")
+        return
+    end
+    local counted = cap > 0 and amount or 0
+    n[sid] = (n[sid] or 0) + counted -- counted up front so parallel awards can't pass the cap
+    if counted > 0 then saveDaily() end
+    request("POST", "/api/private/add", { steam_id = sid, amount = amount, reason = reason,
+        event_id = eventId or GK.ApiAuth.EventId("add", ply) }, function(ok, data, code)
+        if not ok then
+            local b = dailyBucket()
+            if counted > 0 then
+                b[sid] = math.max(0, (b[sid] or 0) - counted) -- not paid: give the allowance back
+                saveDaily()
+            end
+            if IsValid(ply) and (code == 429 or (istable(data) and data.reason == "daily_cap")) then
+                ply:ChatPrint("[gKnuckle] You've hit today's CrabCoin limit. Come back tomorrow.")
+            end
+            return
+        end
+        if IsValid(ply) then
             ply:SetNW2Int("gk_crabcoin", tonumber(data.new_balance) or ply:GetNW2Int("gk_crabcoin"))
             ply:ChatPrint(("+%d CrabCoin (%s)"):format(amount, reason))
         end
