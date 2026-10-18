@@ -16,16 +16,27 @@ local A = GK.ApiAuth
 
 -- H2: keys and signatures only ever go to these origins, whatever a convar says.
 -- Add a custom domain here in code (and only here) when the API moves.
-A.ORIGINS = {
-    ["https://illicit.up.railway.app"] = true,
-    ["https://omerta.chat"] = true,
-    ["https://www.omerta.chat"] = true,
-    ["https://api.gk.style"] = true,
-    ["https://gk.style"] = true,
+-- N8: one list per purpose, so a key or token can only reach the host that serves it.
+--   api:  signed id:secret calls (wallet, backpack, access-role, pack delivery, bans)
+--   chat: the Omerta bot API (COMMUNiTY bridge's Bot token)
+-- The gk.style web host is on neither list.
+A.PURPOSES = {
+    api = {
+        ["https://illicit.up.railway.app"] = true,
+        ["https://api.gk.style"] = true,
+    },
+    chat = {
+        ["https://illicit.up.railway.app"] = true,
+        ["https://omerta.chat"] = true,
+        ["https://www.omerta.chat"] = true,
+    },
 }
-function A.Origin(value)
+A.ORIGINS = {} -- union, for display only
+for _, list in pairs(A.PURPOSES) do for o in pairs(list) do A.ORIGINS[o] = true end end
+function A.Origin(value, purpose)
     local o = string.lower(string.gsub(string.Trim(tostring(value or "")), "/+$", ""))
-    if A.ORIGINS[o] then return o end
+    local list = A.PURPOSES[purpose or "api"]
+    if list and list[o] then return o end
     return nil
 end
 

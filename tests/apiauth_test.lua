@@ -30,6 +30,8 @@ check("sha256 self-test", GK.SHA256OK)
 check("hmac self-test (RFC 4231 #2 + NUL/'6'/'\\' vector)", not A.Disabled)
 check("1e6 x 'a'", GK.SHA256Hex(string.rep("a", 1000000)) == "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0")
 check("origin allowlist", A.Origin("https://illicit.up.railway.app/") == "https://illicit.up.railway.app" and A.Origin("https://evil.example") == nil)
+check("per-purpose origins (N8)", A.Origin("https://gk.style") == nil and A.Origin("https://omerta.chat") == nil
+    and A.Origin("https://omerta.chat", "chat") == "https://omerta.chat" and A.Origin("https://api.gk.style", "chat") == nil)
 check("key format", A.ParseKey("srv1:0123456789abcdef0123") == "srv1" and A.ParseKey("plainsecret") == nil)
 local realTime = os.time
 os.time = function() return 1700000000 end

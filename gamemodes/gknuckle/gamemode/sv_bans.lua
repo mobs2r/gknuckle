@@ -6,9 +6,11 @@
 --   POST /api/integrations/gknuckle/bans/report  { event_id, action, steam_id, minutes, reason, admin_steam_id, source }
 -- Signed like every other call (sv_apiauth.lua) with a gk:bans-scoped key.
 -- server.cfg:
---   gk_bans_api       "https://illicit.up.railway.app"   (empty = off; must be on GK.ApiAuth.ORIGINS)
+--   gk_bans_api       "https://illicit.up.railway.app"   (empty = off; must be on GK.ApiAuth.PURPOSES.api)
 --   gk_bans_key       "<id>:<secret>"                     (empty = use gk_pack_key)
 --   gk_bans_failmode  "open"                              ("closed" refuses joins it can't check)
+--     N13: "open" (default) lets globally banned players in while the ban API is down;
+--     "closed" refuses every first connect until the cache has an answer for them.
 -- Local ULX/SAM bans keep working on their own; this only adds the Omerta ones.
 
 GK.Bans = GK.Bans or {}
@@ -196,7 +198,21 @@ concommand.Add("gk_mod_kick", function(ply, _, args)
     if not GK.RequireAccess(ply, "gknuckle.moderate") then return end
     local target = B.FindTarget(args[1])
     if not IsValid(target) then if IsValid(ply) then ply:PrintMessage(HUD_PRINTCONSOLE, "[gKnuckle] no single player matches") end return end
+    -- N3: only owners configured in gk_owner_steamids are immune (not an Omerta role).
     if GK.IsOwnerSteamID and GK.IsOwnerSteamID(target:SteamID64()) then return end
+    -- N10: moderators can't kick the server's own admins; admin-mod immunity applies.
+    if IsValid(ply) then
+        -- Staff (anyone with gknuckle.moderate) can only be kicked by a bans admin.
+        if GK.HasAccess(target, "gknuckle.moderate") and not GK.HasAccess(ply, "gknuckle.bans_admin") then
+            ply:PrintMessage(HUD_PRINTCONSOLE, "[gKnuckle] you can't kick that player") return
+        end
+        -- When the caller's access comes from the admin mod, let it apply target immunity.
+        local okA, viaCami = pcall(CAMI.PlayerHasAccess, ply, "gknuckle.moderate", nil)
+        if okA and viaCami == true then
+            local okT, canTarget = pcall(CAMI.PlayerHasAccess, ply, "gknuckle.moderate", nil, target)
+            if okT and canTarget == false then ply:PrintMessage(HUD_PRINTCONSOLE, "[gKnuckle] you can't kick that player (immunity)") return end
+        end
+    end
     local reason = string.sub(table.concat(args, " ", 2), 1, 120)
     print(("[gKnuckle] %s kicked %s (%s): %s"):format(IsValid(ply) and ply:Nick() or "console", target:Nick(), target:SteamID64(), reason))
     target:Kick(reason ~= "" and reason or "Kicked by a moderator")

@@ -11,7 +11,7 @@
 --        (after= and author{} are proposed additions; without them the newest 50 are
 --        read and filtered by id, and names fall back to "web".)
 -- server.cfg:
---   gk_community_api        "https://illicit.up.railway.app"   (must be on GK.ApiAuth.ORIGINS)
+--   gk_community_api        "https://illicit.up.railway.app"   (must be on GK.ApiAuth.PURPOSES.chat)
 --   gk_community_bot_token  "omb_..."                           (protected, never sent to clients)
 --   gk_community_channel    "gknuckle"
 -- Empty api or token = bridge off.
@@ -49,7 +49,7 @@ local C = { cursor = 0, primed = false, number = nil, seen = {}, seenOrder = {},
     inflight = false, inflightAt = 0, nextPoll = 0, fails = 0, lastSend = 0, warned = {}, sent = {}, recent = {}, muted = {}, day = { d = os.date("%Y%m%d"), n = 0 } }
 GKCommunity.state = C
 
-local function origin() return GK.ApiAuth.Origin(cvApi:GetString()) end
+local function origin() return GK.ApiAuth.Origin(cvApi:GetString(), "chat") end
 local function channel()
     local c = string.lower(string.Trim(cvChannel:GetString()))
     return string.match(c, "^[%w_%-]+$") and c or nil
@@ -309,7 +309,7 @@ end)
 timer.Create("GK_CommunityTick", 0.25, 0, function()
     if not enabled() then
         C.primed = false -- re-prime when it's switched on again
-        if cvToken:GetString() ~= "" and cvApi:GetString() ~= "" and not origin() then warn("origin", "gk_community_api isn't on GK.ApiAuth.ORIGINS; bridge off") end
+        if cvToken:GetString() ~= "" and cvApi:GetString() ~= "" and not origin() then warn("origin", "gk_community_api isn't on GK.ApiAuth.PURPOSES.chat; bridge off") end
         return
     end
     flush()

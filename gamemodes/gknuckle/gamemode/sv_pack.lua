@@ -173,6 +173,8 @@ end)
 
 net.Receive("gk_pack_refresh", function(_, ply)
     if not IsValid(ply) or throttled(ply, "GK_PackRefreshAt", 8) then return end
+    -- N9: same L5 wait as hello, and only for a player who already has an offer.
+    if not ply.GK_PackOffer or not (ply:IsFullyAuthenticated() or game.SinglePlayer()) then return end
     deliver(ply, ply.GK_PackHave or "")
 end)
 

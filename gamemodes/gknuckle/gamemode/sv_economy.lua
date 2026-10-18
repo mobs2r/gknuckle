@@ -26,7 +26,7 @@ end
 
 local warnedLegacy = false
 -- onDone(ok, data, code). Shared with sv_backpack.lua, which passes its own origin.
--- H2: the origin must be on GK.ApiAuth.ORIGINS (pinned in code), and only 2xx is ok;
+-- H2: the origin must be on GK.ApiAuth.PURPOSES.api (pinned in code), and only 2xx is ok;
 -- a redirect is a failure so the key is never re-sent somewhere else.
 local function request(method, path, body, onDone, originOverride)
     if not enabled() then return end
@@ -43,7 +43,7 @@ local function request(method, path, body, onDone, originOverride)
     if GK.ApiAuth.ParseKey(cvKey:GetString()) then
         return GK.ApiAuth.Request(origin, cvKey:GetString(), method, path, body, done, label)
     end
-    local o = GK.ApiAuth.Origin(origin)
+    local o = GK.ApiAuth.Origin(origin, "api")
     if not o then
         print(("[gKnuckle] %s %q is not on the allowlist (sv_apiauth.lua); request skipped"):format(label, origin))
         return done(0, { error = "origin not allowed" })

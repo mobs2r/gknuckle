@@ -4,7 +4,7 @@
 --   GET  /api/private/gknuckle/<steamid64> -> { bugz, bugz_cap, roaches, balance }
 --   POST /api/private/gknuckle/save        <- { steam_id, event_id, bugz (0-999), source, version }
 -- OFF unless both are set in server.cfg:
---   gk_backpack_api "https://illicit.up.railway.app"   (must be on GK.ApiAuth.ORIGINS)
+--   gk_backpack_api "https://illicit.up.railway.app"   (must be on GK.ApiAuth.PURPOSES.api)
 --   gk_economy_key  "<id>:<secret>"                     (shared with sv_economy.lua)
 -- TODO(backend): xenium lumps and the bag's items aren't stored by the API yet, so they
 -- stay local to this session (not saved, not restored). Add them to /gknuckle/save
