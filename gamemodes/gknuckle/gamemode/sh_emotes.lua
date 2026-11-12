@@ -86,9 +86,9 @@ end
 if SERVER then
     util.AddNetworkString("gk_emote")
     net.Receive("gk_emote", function(_, ply)
-        local e = GK.Emotes[net.ReadString()]
+        if not IsValid(ply) or (ply.GK_NextEmote or 0) > CurTime() then return end
+        local e = GK.Emotes[string.sub(net.ReadString(), 1, 32)]
         if not e or not ply:Alive() or GK.IsDowned(ply) or GK.IsRagdolled(ply) or GK.IsImpaled(ply) or not GK.IsChipOnline(ply) then return end
-        if (ply.GK_NextEmote or 0) > CurTime() then return end
         ply.GK_NextEmote = CurTime() + 0.5
         ply:SetNW2String("gk_emote_id", e.id)
         ply:SetNW2Float("gk_emote_until", CurTime() + e.time)
