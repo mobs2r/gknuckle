@@ -163,6 +163,22 @@ function GK.GripRange(ply)
     return base * (GK.BuffMult and GK.BuffMult(ply, "reach") or 1)
 end
 
+-- ents.FindByClass walks the whole entity list. Some lookups run per player per
+-- tick (ladders in GM:Move, ropes in the grip trace), so share one scan per class
+-- per tick. The list can hold an entity removed earlier in the same tick: check
+-- IsValid on what you get back.
+local classCache, classCacheTick = {}, -1
+function GK.EntsByClass(class)
+    local tick = engine.TickCount()
+    if tick ~= classCacheTick then classCache, classCacheTick = {}, tick end
+    local list = classCache[class]
+    if not list then
+        list = ents.FindByClass(class)
+        classCache[class] = list
+    end
+    return list
+end
+
 include("sh_buffs.lua")
 include("sh_ladders.lua")
 include("sh_movement.lua")

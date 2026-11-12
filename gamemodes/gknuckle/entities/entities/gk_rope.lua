@@ -32,9 +32,12 @@ if SERVER then
         local best, bestDist
         -- Ropes, plus anything else rope-like (a barnacle's tongue: ENT:RopeSegment).
         local segs = {}
-        for _, rope in ipairs(ents.FindByClass("gk_rope")) do segs[#segs + 1] = { rope:GetPos(), rope:GetBottom() } end
-        for _, e in ipairs(ents.FindByClass("gk_barnacle")) do
-            local a, b = e:RopeSegment()
+        for _, rope in ipairs(GK.EntsByClass("gk_rope")) do
+            if IsValid(rope) then segs[#segs + 1] = { rope:GetPos(), rope:GetBottom() } end
+        end
+        for _, e in ipairs(GK.EntsByClass("gk_barnacle")) do
+            local a, b
+            if IsValid(e) and e.RopeSegment then a, b = e:RopeSegment() end
             if a then segs[#segs + 1] = { a, b } end
         end
         for _, seg in ipairs(segs) do

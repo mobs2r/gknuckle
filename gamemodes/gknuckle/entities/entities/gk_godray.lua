@@ -71,7 +71,7 @@ if CLIENT then
         if not IsValid(ply) then return end
         local want = 0
         local eye, aim = ply:EyePos(), ply:GetAimVector()
-        for _, ray in ipairs(ents.FindByClass("gk_godray")) do
+        for _, ray in ipairs(GK.EntsByClass("gk_godray")) do
             -- Seen once with its network vars missing on the client: set them up
             -- rather than erroring every frame.
             if not ray.GetCone and ray.SetupDataTables and ray.InstallDataTable then

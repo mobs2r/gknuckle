@@ -85,9 +85,10 @@ if SERVER then
     end
 
     -- An item in that hand lowers the fist.
+    local SIDES = { "l", "r" }
     hook.Add("Think", "GK_FistItems", function()
         for _, ply in ipairs(player.GetAll()) do
-            for _, side in ipairs({ "l", "r" }) do
+            for _, side in ipairs(SIDES) do
                 if GK.HasFist(ply, side) and GK.Inv.HandItem(ply, side) then ply:SetNW2Bool("gk_fist_" .. side, false) end
                 if not GK.HasFist(ply, side) and ply:GetNW2Float("gk_punch_charge_" .. side, 0) ~= 0 then ply:SetNW2Float("gk_punch_charge_" .. side, 0) end
             end
