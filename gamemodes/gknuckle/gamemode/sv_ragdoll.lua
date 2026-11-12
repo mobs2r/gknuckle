@@ -70,8 +70,23 @@ function GK.Unragdoll(ply)
 end
 
 hook.Add("PlayerDisconnected", "GK_RagdollCleanup", function(ply)
+    timer.Remove("GK_Unragdoll_" .. ply:EntIndex())
     local rag = ply:GetNW2Entity("gk_ragdoll")
     if IsValid(rag) then rag:Remove() end
+end)
+
+-- Respawned some other way while still knocked down (a run ending sends everyone
+-- back to the hub with Spawn()): drop the body and its get-up timer, or the timer
+-- would later pull the player back to wherever the body was lying.
+-- GK.Unragdoll clears gk_ragdoll before its own Spawn(), so it never lands here.
+hook.Add("PlayerSpawn", "GK_RagdollSpawnReset", function(ply)
+    local rag = ply:GetNW2Entity("gk_ragdoll")
+    if not IsValid(rag) then return end
+    timer.Remove("GK_Unragdoll_" .. ply:EntIndex())
+    ply:SetNW2Entity("gk_ragdoll", NULL)
+    ply:UnSpectate()
+    ply:SetNoDraw(false)
+    rag:Remove()
 end)
 
 hook.Add("DoPlayerDeath", "GK_RagdollDeath", function(ply)

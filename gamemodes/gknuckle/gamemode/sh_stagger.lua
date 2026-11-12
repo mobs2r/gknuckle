@@ -147,8 +147,22 @@ if SERVER then
         ply:SetNotSolid(false)
     end)
     hook.Add("PlayerSpawn", "GK_StaggerReset", function(ply)
+        -- Respawned while lying staggered (e.g. a run ending sends everyone to the hub):
+        -- remove the body and undo the hide, or it stays behind and the player stays
+        -- invisible and non-solid.
+        local wasStaggered = GK.IsStaggered(ply)
+        local rag = S.Ragdoll(ply)
+        if IsValid(rag) then rag:Remove() end
         ply:SetNW2Bool("gk_staggered", false)
         ply:SetNW2Entity("gk_stagger_rag", NULL)
+        if wasStaggered then
+            ply:SetNoDraw(false)
+            ply:SetNotSolid(false)
+        end
+    end)
+    hook.Add("PlayerDisconnected", "GK_StaggerCleanup", function(ply)
+        local rag = S.Ragdoll(ply)
+        if IsValid(rag) then rag:Remove() end
     end)
 end
 

@@ -22,8 +22,9 @@ local function yardProp(t, mdl)
     p:SetPos(t:GetPos() + Vector(0, 0, 4)) p:SetAngles(t:GetAngles()) p:Spawn()
     p.GK_FromHubSpot = true
     local home = t:GetPos()
-    timer.Create("GK_Yard" .. p:EntIndex(), 10, 0, function()
-        if not IsValid(p) then return end
+    local yardTimer = "GK_Yard" .. p:EntIndex()
+    timer.Create(yardTimer, 10, 0, function()
+        if not IsValid(p) then timer.Remove(yardTimer) return end
         if p:GetPos():DistToSqr(home) > 900 * 900 then p:Remove() end
     end)
     p:CallOnRemove("GK_YardBack", function() timer.Simple(20, function() yardProp(t, mdl) end) end)
