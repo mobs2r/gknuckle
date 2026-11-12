@@ -66,10 +66,6 @@ end
 
 if SERVER then
 
-local function setStamina(ply, v)
-    GK.SetStamina(ply, v)
-end
-
 -- anchor = this hand is holding the player's weight (sh_movement springs them to it);
 -- top = the hold is a ledge's top surface, so pulling up (W) mantles over it.
 -- lip/into: where the ledge's top is and the way over it (sh_movement's mantle).

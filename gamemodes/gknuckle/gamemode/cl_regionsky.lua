@@ -52,13 +52,11 @@ hook.Add("Think", "GK_RegionSkyBlend", function()
     local look, key = regionLook()
     if look then cur = look end
     blend = math.Approach(blend, look and 1 or 0, FrameTime() * 1.5)
-    if DEBUG then
-        if CurTime() > nextDbg then
-            nextDbg = CurTime() + 2
-            local ply = LocalPlayer()
-            local hub = GK.HubLayout and GK.HubLayout()
-            print("[GKSKY]", "arenaNW", IsValid(ply) and ply:GetNW2Int("gk_arena", 0) or -1, "hub", tostring(hub and #hub.arenas), "pos", tostring(IsValid(ply) and ply:GetPos()), "region1", GetGlobal2String("gk_arena_region_1", ""), "key", tostring(key), "blend", blend)
-        end
+    if DEBUG and CurTime() > nextDbg then
+        nextDbg = CurTime() + 2
+        local ply = LocalPlayer()
+        local hub = GK.HubLayout and GK.HubLayout()
+        print("[GKSKY]", "arenaNW", IsValid(ply) and ply:GetNW2Int("gk_arena", 0) or -1, "hub", tostring(hub and #hub.arenas), "pos", tostring(IsValid(ply) and ply:GetPos()), "region1", GetGlobal2String("gk_arena_region_1", ""), "key", tostring(key), "blend", blend)
     end
 end)
 

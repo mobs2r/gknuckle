@@ -100,7 +100,7 @@ if CLIENT then
             elseif string.StartsWith(kind, "run_") and GK.Hub.Arenas then
                 local a = (GK.Hub.Arenas() or {})[tonumber(string.sub(kind, 5)) or 0]
                 if a and a.active then
-                    d = { title = "", lines = { ("RUN iN PROGRESS"), ("SUBJECTS ALiVE  %d / %d"):format(a.alive or 0, a.total or 0),
+                    d = { title = "", lines = { "RUN iN PROGRESS", ("SUBJECTS ALiVE  %d / %d"):format(a.alive or 0, a.total or 0),
                         ("ELAPSED  %s"):format(string.FormattedTime(CurTime() - (a.started or CurTime()), "%02i:%02i")), ("GAS  z %d"):format(a.gasHeight or 0) } }
                 else d = nil end
             end

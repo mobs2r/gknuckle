@@ -34,7 +34,6 @@ function GK.LadderMove(ply, mv)
     local up = l:GetUp()
     local right = l:GetRight()
     local fs, ss = mv:GetForwardSpeed(), mv:GetSideSpeed()
-    local maxIn = math.max(math.abs(fs), math.abs(ss), 1)
 
     -- What you're asking for, exactly like Source/CS:GO's LadderMove: your
     -- full 3D move input (view pitch included), in units of climb speed.

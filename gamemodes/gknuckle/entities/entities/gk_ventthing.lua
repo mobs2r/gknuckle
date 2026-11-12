@@ -172,9 +172,8 @@ if SERVER then
         self:SetHandTire(1 - self.GK_Stamina / HAND_STAMINA)
 
         if ct < self.GK_RetreatUntil or st == RETREAT then
-            if self:MoveHand(root, RETREAT_SPEED, dt) or ct >= self.GK_RetreatUntil then
-                if ct >= self.GK_RetreatUntil then self:SetState(IDLE) end
-            end
+            self:MoveHand(root, RETREAT_SPEED, dt)
+            if ct >= self.GK_RetreatUntil then self:SetState(IDLE) end
             return self:Next(ct)
         end
 

@@ -100,7 +100,6 @@ if SERVER then
     -- Press whatever slot `ply` is pointing at. Returns true if it hit one.
     function ENT:Press(ply, hitpos)
         -- The roach hole beside the counter: in the hub, feed it your roaches to bank them.
-        local L = self.Layout
         local lp = self:WorldToLocal(hitpos)
         if self:AtRoachSlot(lp) then -- feed it: hub or run, roaches go into the machine
             local n = (GK.RunMode and GK.RunMode(ply) == "iron") and 0 or GK.Roaches.Bank(ply) -- Iron Knuckle: no bank

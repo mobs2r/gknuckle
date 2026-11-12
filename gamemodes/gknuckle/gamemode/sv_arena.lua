@@ -206,7 +206,7 @@ function GK.StartArena(index, players, forced)
             -- The hub's staging tube: up into the dark first, then you're there.
             -- Each pad has its own tube (gk_vacuum_top_N); the old single one as a fallback.
             local top = ents.FindByName("gk_vacuum_top_" .. index)[1] or ents.FindByName("gk_vacuum_top")[1]
-            if IsValid(top) and p:GetPos().z < top:GetPos().z and GetConVar("gk_tube_rise"):GetBool() then
+            if IsValid(top) and p:GetPos().z < top:GetPos().z and cvRise:GetBool() then
                 -- The ride is the camera's only (sh_movement.lua holds you still,
                 -- the view climbs into the dark): moving bodies up through the
                 -- tube crashed vphysics in full matches.
@@ -615,12 +615,12 @@ timer.Create("GK_Rounds", 0.25, 0, function()
         end
         -- A trailing squad caught by the gas can be the last thing a stage waited on.
         if R.arenas[index] == a and a.atBreak and (a.teamCount == 1 or table.Count(teamsAlive) > 1) then GK.CheckStageDone(index) end
-        if R.arenas[index] ~= a then
-            -- moved on above
-        elseif alive == 0 then
-            GK.EndArena(index, nil)
-        elseif table.Count(teamsAlive) == 1 and a.teamCount > 1 then
-            GK.EndArena(index, next(teamsAlive), "last") -- last team standing (a solo run goes on to the top)
+        if R.arenas[index] == a then -- (else it moved on above)
+            if alive == 0 then
+                GK.EndArena(index, nil)
+            elseif table.Count(teamsAlive) == 1 and a.teamCount > 1 then
+                GK.EndArena(index, next(teamsAlive), "last") -- last team standing (a solo run goes on to the top)
+            end
         end
     end
 end)

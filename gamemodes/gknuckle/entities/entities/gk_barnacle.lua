@@ -37,7 +37,6 @@ if SERVER then
     local SCAN = 5 * M           -- tongue reach
     local SPEED = 1.2 * M        -- tongue creep, u/s
     local RETRACT_SPEED = 4 * M
-    local PULL = 70              -- u/s reeling a victim up
     local BITE_RANGE = 2 * M
     local BITE_DMG, BITE_RATE = 10, 0.5
     local WAIT = 5               -- after a retract, before reaching again
@@ -188,7 +187,7 @@ if CLIENT then
         if len < 2 then return end
         render.SetMaterial(tongue)
         -- A slightly sagging tongue in a few segments.
-        local prev, n = a, 6
+        local n = 6
         render.StartBeam(n + 1)
         for i = 0, n do
             local t = i / n

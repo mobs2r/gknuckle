@@ -44,6 +44,12 @@ addon.json                  gmad/gmpublisher descriptor
  models/, materials/ and sound/ come from the playable-pack)
 ```
 
+## Install (server)
+
+1. Put this repo in `garrysmod/addons/gknuckle/` (it's laid out as an addon: `gamemodes/gknuckle/...`), or add the [Workshop item](https://steamcommunity.com/sharedfiles/filedetails/?id=3479529954) to the server's collection.
+2. Add the [White Knuckle Prop Pack](https://steamcommunity.com/sharedfiles/filedetails/?id=3817814674) and [NPCs Pack](https://steamcommunity.com/sharedfiles/filedetails/?id=3818830408) to the same collection.
+3. Start with `+gamemode gknuckle +map gk_style` and copy the settings you need from `server.cfg.example` into `cfg/server.cfg`.
+
 ## Configuration
 
 All settings are server convars. Put them in `cfg/server.cfg` and never commit the keys. `server.cfg.example` lists every setting.
@@ -75,3 +81,20 @@ Without one of those, **the economy is off**, and the server console says so in 
 **Bans (Omerta).** Set `gk_bans_api` and `gk_bans_key` (or reuse `gk_pack_key`). Every joining player is checked against Omerta's global ban list, including the owner of a family-shared copy. Bans made in game with ULX or SAM are reported to Omerta's moderation queue. They don't become global bans automatically; a moderator has to promote them. Banned players see the reason and can appeal at **https://bans.gk.style**.
 
 Every key and token convar is protected, so it isn't sent to clients or recorded in demos. Never commit them, and never put them in a Workshop upload.
+
+## Development
+
+CI (`.github/workflows/lua-checks.yml`) runs on every pull request: every Lua file must parse under LuaJIT (`luajit -bl`), and `tests/apiauth_test.lua` checks SHA-256, HMAC signing and the pinned API origins.
+
+[glualint](https://github.com/FPtje/GLuaFixer) lints `gamemodes/` and `tests/` with the settings in `.glualint.json` (the in-game `sh_*test.lua` harnesses are skipped and the nesting-depth rule is off); the tree is lint-clean.
+
+Run the same checks locally:
+
+```
+glualint lint gamemodes tests
+luajit tests/apiauth_test.lua
+```
+
+Keep code to plain Lua 5.1 syntax (no `continue`, `!=`, `&&` or `//` comments) so the LuaJIT parse check keeps passing.
+
+`addon.json` keeps docs, tests, CI and lint config out of the Workshop pack.

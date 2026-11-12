@@ -248,17 +248,17 @@ end
 -- CS:GO's duck spam rule: ducking itself gets slower the more you spam it
 -- (each press uses up duck speed, which comes back over a second or two);
 -- walking speed is untouched.
-local DUCK_MAX, DUCK_COST, DUCK_RECOVER, DUCK_TIME = 8, 2, 3, 0.2
+local DUCK_RES_MAX, DUCK_COST, DUCK_RECOVER, DUCK_TIME = 8, 2, 3, 0.2
 function GK.DuckSpam(ply, mv)
     local ct = CurTime()
-    local v, t = ply.GK_DuckRes or DUCK_MAX, ply.GK_DuckT or ct
-    if ct > t then v = math.min(DUCK_MAX, v + (ct - t) * DUCK_RECOVER) end
+    local v, t = ply.GK_DuckRes or DUCK_RES_MAX, ply.GK_DuckT or ct
+    if ct > t then v = math.min(DUCK_RES_MAX, v + (ct - t) * DUCK_RECOVER) end
     if mv:KeyPressed(IN_DUCK) and ct > (ply.GK_DuckEvt or 0) then
         ply.GK_DuckEvt = ct
         v = math.max(0, v - DUCK_COST)
     end
     if ct >= t then ply.GK_DuckRes, ply.GK_DuckT = v, ct end
-    local time = DUCK_TIME * DUCK_MAX / math.max(v, 1.6)
+    local time = DUCK_TIME * DUCK_RES_MAX / math.max(v, 1.6)
     if math.abs(ply:GetDuckSpeed() - time) > 0.01 then
         ply:SetDuckSpeed(time)
         ply:SetUnDuckSpeed(time)

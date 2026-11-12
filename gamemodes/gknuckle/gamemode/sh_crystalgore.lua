@@ -109,7 +109,7 @@ if CLIENT then
         local pos, dir, n, col = net.ReadVector(), net.ReadVector(), net.ReadUInt(6), net.ReadColor()
         for i = 1, n do
             pieces[#pieces + 1] = {
-                shard = math.Rand(1.5, 4), pos = pos + VectorRand() * 3, vel = (dir * 120 + VectorRand() * 160 + Vector(0, 0, 90)),
+                shard = math.Rand(1.5, 4), pos = pos + VectorRand() * 3, vel = dir * 120 + VectorRand() * 160 + Vector(0, 0, 90),
                 ang = AngleRand(), spin = AngleRand() * 2, col = col, born = CurTime(),
             }
             -- Glowing blood droplets.
