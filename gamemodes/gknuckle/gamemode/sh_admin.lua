@@ -83,7 +83,13 @@ if SERVER then
                 roleCache[sid] = { role = c and c.role, expires = c and c.expires or 0, asking = true }
                 GK.ApiAuth.Request(api:GetString(), key:GetString(), "GET", "/api/private/access-role/" .. sid, nil, function(code, data)
                     local role = (code == 200 and ROLES[data.role]) and data.role or nil -- fail closed
-                    roleCache[sid] = { role = role, expires = CurTime() + (code == 200 and 300 or 60) }
+                    -- Expired, settled entries already read as "no role"; drop them so the cache
+                    -- doesn't keep one entry per SteamID ever seen.
+                    local now = CurTime()
+                    for s, e in pairs(roleCache) do
+                        if not e.asking and e.expires <= now then roleCache[s] = nil end
+                    end
+                    roleCache[sid] = { role = role, expires = now + (code == 200 and 300 or 60) }
                     if IsValid(ply) then
                         ply.GK_Access = nil
                         ply:SetNW2String("gk_role", GK.IsOwnerSteamID(sid) and "owner" or (role or ""))

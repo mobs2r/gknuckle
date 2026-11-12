@@ -38,6 +38,14 @@ local cvMinClimb = CreateConVar("gk_arena_min_climb", "16", FCVAR_ARCHIVE, "Metr
 local cvCooldown = CreateConVar("gk_arena_reward_cooldown", "600", FCVAR_ARCHIVE, "Seconds between arena payouts for one SteamID")
 local paidAt = {} -- SteamID64 -> os.time() of the last arena payout
 
+-- Entries past the cooldown behave exactly like no entry, so drop them as we go.
+local function prunePaid(cooldown)
+    local now = os.time()
+    for s, t in pairs(paidAt) do
+        if now - t >= cooldown then paidAt[s] = nil end
+    end
+end
+
 GK.Rounds = GK.Rounds or { arenas = {}, forceUntil = 0 }
 local R = GK.Rounds
 
@@ -259,6 +267,7 @@ function GK.EndArena(index, winTeam, how)
             winners[#winners + 1] = p
             local sid = p:SteamID64() or ""
             if pay and not p:IsBot() and os.time() - (paidAt[sid] or 0) >= cvCooldown:GetInt() then
+                prunePaid(cvCooldown:GetInt())
                 paidAt[sid] = os.time()
                 -- One payout per player per run, even if this is ever called twice.
                 GK.Economy.Add(p, cvReward:GetInt(), "gknuckle_arena_win",

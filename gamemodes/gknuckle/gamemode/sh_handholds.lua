@@ -150,6 +150,8 @@ end
 if CLIENT then
     local glow = Material("sprites/light_glow02_add")
     local RANGE = 1600
+    local RANGE_SQR = RANGE * RANGE
+    local HALO, CORE = Color(255, 30, 20, 200), Color(255, 140, 120, 255)
     -- Red pitons glow, as in WK. Draws the nearest ones only.
     hook.Add("PostDrawTranslucentRenderables", "GK_PitonGlow", function(depth, sky)
         if depth or sky then return end
@@ -162,10 +164,10 @@ if CLIENT then
             for i, box in ipairs(boxesOf(piece:GetPiece()).pitons) do
                 do
                     local c = p + (box.mins + box.maxs) * 0.5
-                    if c:DistToSqr(eye) < RANGE * RANGE then
+                    if c:DistToSqr(eye) < RANGE_SQR then
                         local pulse = 0.8 + math.sin(t * 2 + i) * 0.2
-                        render.DrawSprite(c, 26 * pulse, 26 * pulse, Color(255, 30, 20, 200))
-                        render.DrawSprite(c, 9, 9, Color(255, 140, 120, 255))
+                        render.DrawSprite(c, 26 * pulse, 26 * pulse, HALO)
+                        render.DrawSprite(c, 9, 9, CORE)
                         drawn = drawn + 1
                         if drawn > 120 then return end
                     end
