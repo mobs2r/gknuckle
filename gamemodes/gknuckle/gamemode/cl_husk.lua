@@ -16,14 +16,16 @@ local function fallbackVisuals(ply)
 end
 
 -- One GK.PlayerVisuals call per player per frame, however many materials ask.
-local cache = {}
+-- Weak keys so players/props that leave don't pin their entry; the entry is reused
+-- instead of allocating a new table per player per frame.
+local cache = setmetatable({}, { __mode = "k" })
 function GK.Husk.Visuals(ply)
     local fr = FrameNumber()
     local e = cache[ply]
     if e and e.frame == fr then return e.v end
     if GK.Husk.Override and GK.Husk.Override[ply] then return GK.Husk.Override[ply] end
     local v = (GK.PlayerVisuals and IsValid(ply) and ply:IsPlayer()) and GK.PlayerVisuals(ply) or fallbackVisuals(ply)
-    cache[ply] = { frame = fr, v = v }
+    if e then e.frame, e.v = fr, v else cache[ply] = { frame = fr, v = v } end
     return v
 end
 

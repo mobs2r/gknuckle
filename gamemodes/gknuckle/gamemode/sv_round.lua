@@ -8,6 +8,14 @@ local cvReward = CreateConVar("gk_finish_reward", "25", FCVAR_ARCHIVE + FCVAR_NO
 local cvCooldown = CreateConVar("gk_finish_reward_cooldown", "1800", FCVAR_ARCHIVE, "Seconds before the same player can be paid for a course win again")
 local paidAt = {} -- SteamID64 -> os.time() of their last course payout (survives rejoin)
 
+-- Entries past the cooldown behave exactly like no entry, so drop them as we go.
+local function prunePaid(cooldown)
+    local now = os.time()
+    for s, t in pairs(paidAt) do
+        if now - t >= cooldown then paidAt[s] = nil end
+    end
+end
+
 GK.Round = GK.Round or { finishers = {} }
 
 local function setRoundEnd(t)
@@ -79,6 +87,7 @@ function GK.Round.Finish(ply)
     -- cooldown per player, and once per round (event id).
     local sid = ply:SteamID64() or ""
     if place == 1 and #player.GetHumans() >= 2 and os.time() - (paidAt[sid] or 0) >= cvCooldown:GetInt() then
+        prunePaid(cvCooldown:GetInt())
         paidAt[sid] = os.time()
         GK.Economy.Add(ply, cvReward:GetInt(), "gknuckle_course_win",
             GK.ApiAuth.EventId("course_win", ply, game.GetMap() .. ":" .. math.floor(GetGlobal2Float("gk_round_start", 0))))
