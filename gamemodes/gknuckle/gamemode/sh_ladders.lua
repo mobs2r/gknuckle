@@ -18,8 +18,8 @@ local SNEAK = 0.5        -- walk key: half speed, and silent, like CS:GO
 
 function GK.LadderAt(pos)
     local centre = pos + Vector(0, 0, 36)
-    for _, l in ipairs(ents.FindByClass("gk_ladder")) do
-        if l.Contains and l:Contains(centre, 16) then return l end
+    for _, l in ipairs(GK.EntsByClass("gk_ladder")) do
+        if IsValid(l) and l.Contains and l:Contains(centre, 16) then return l end
     end
 end
 

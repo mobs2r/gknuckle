@@ -426,5 +426,13 @@ if CLIENT then
                 lights[ply] = nil
             end
         end
+        -- A player who left (or went invalid) is no longer in player.GetAll():
+        -- drop their light, or it stays lit where they disconnected.
+        for ply, pt in pairs(lights) do
+            if not IsValid(ply) then
+                if IsValid(pt) then pt:Remove() end
+                lights[ply] = nil
+            end
+        end
     end)
 end

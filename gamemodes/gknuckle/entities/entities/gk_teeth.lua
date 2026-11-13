@@ -112,8 +112,8 @@ if SERVER then
     -- Light it can't stand: a lit flashlight pointed at it, or a burning flare.
     function ENT:InLight()
         local c = self:WorldSpaceCenter()
-        for _, f in ipairs(ents.FindByClass("gk_flare")) do
-            if f:GetPos():DistToSqr(c) < 300 * 300 then return true end
+        for _, f in ipairs(GK.EntsByClass("gk_flare")) do
+            if IsValid(f) and f:GetPos():DistToSqr(c) < 300 * 300 then return true end
         end
         for _, p in ipairs(player.GetAll()) do
             if p:Alive() and p:GetNW2Bool("gk_flashlight", false) then

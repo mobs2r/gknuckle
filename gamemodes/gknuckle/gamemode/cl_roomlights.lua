@@ -41,12 +41,14 @@ hook.Add("Think", "GK_RoomLights", function()
     if not cv:GetBool() then return end
     local eye = EyePos()
     local near = {}
-    for _, piece in ipairs(ents.FindByClass("gk_level_piece")) do
-        local p = piece:GetPos()
-        for i, lamp in ipairs(lampsOf(piece:GetPiece())) do
-            local wp = p + lamp.pos
-            local d2 = wp:DistToSqr(eye)
-            if d2 < RANGE2 then near[#near + 1] = { d2 = d2, pos = wp, lamp = lamp, key = piece:EntIndex() * 4096 + i } end
+    for _, piece in ipairs(GK.EntsByClass("gk_level_piece")) do
+        if IsValid(piece) then
+            local p = piece:GetPos()
+            for i, lamp in ipairs(lampsOf(piece:GetPiece())) do
+                local wp = p + lamp.pos
+                local d2 = wp:DistToSqr(eye)
+                if d2 < RANGE2 then near[#near + 1] = { d2 = d2, pos = wp, lamp = lamp, key = piece:EntIndex() * 4096 + i } end
+            end
         end
     end
     table.sort(near, function(a, b) return a.d2 < b.d2 end)

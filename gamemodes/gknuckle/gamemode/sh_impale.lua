@@ -386,10 +386,13 @@ function GK.RebarHit(ply, tr, dir, rebar, attacker)
     -- Staked to the floor: laid flat on it (sh_impale_prone.lua).
     if floorPin and GK.MakeProne then GK.MakeProne(ply) end
     -- The bar stays while they're on it, then lingers as a handhold like any stuck rebar.
-    timer.Create("GK_PinBar_" .. bar:EntIndex(), 1, 0, function()
-        if not IsValid(bar) then return end
+    local pinTimer = "GK_PinBar_" .. bar:EntIndex()
+    timer.Create(pinTimer, 1, 0, function()
+        -- The bar can be removed some other way (cleanup, a blast): stop the repeating
+        -- timer then too, instead of leaving it running forever.
+        if not IsValid(bar) then timer.Remove(pinTimer) return end
         if not IsValid(ply) or ply:GetNW2Entity("gk_impaled") ~= bar then
-            timer.Remove("GK_PinBar_" .. bar:EntIndex())
+            timer.Remove(pinTimer)
             SafeRemoveEntityDelayed(bar, 30)
         end
     end)
