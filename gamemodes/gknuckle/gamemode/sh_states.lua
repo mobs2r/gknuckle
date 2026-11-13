@@ -85,6 +85,13 @@ end
 if SERVER then
     util.AddNetworkString("gk_menu")
     net.Receive("gk_menu", function(_, ply)
+        if not IsValid(ply) then return end
+        -- The client only sends on a change (polled every 0.25 s); a toggle flood would
+        -- otherwise turn into a networked-var update to every player each message.
+        local now = CurTime()
+        if (ply.GK_MenuWindow or 0) < now then ply.GK_MenuWindow, ply.GK_MenuMsgs = now + 1, 0 end
+        ply.GK_MenuMsgs = (ply.GK_MenuMsgs or 0) + 1
+        if ply.GK_MenuMsgs > 10 then return end
         local open = net.ReadBool()
         -- Only touch the networked var on a real change, so spamming the message costs nothing.
         if ply:GetNW2Bool("gk_in_menu", false) ~= open then ply:SetNW2Bool("gk_in_menu", open) end

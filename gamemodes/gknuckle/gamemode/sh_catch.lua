@@ -49,9 +49,20 @@ end
 if SERVER then
     util.AddNetworkString("gk_catch")
     net.Receive("gk_catch", function(_, ply)
+        if not IsValid(ply) or not ply:Alive() then return end
+        -- A real click is one message per press: cap a flood (each one runs a roach's Press).
+        local now = CurTime()
+        if (ply.GK_CatchWindow or 0) < now then ply.GK_CatchWindow, ply.GK_Catches = now + 1, 0 end
+        ply.GK_Catches = (ply.GK_Catches or 0) + 1
+        if ply.GK_Catches > 12 then return end
         local r, side = net.ReadEntity(), net.ReadString()
         if side ~= "l" and side ~= "r" then return end
-        if not IsValid(r) or r:GetClass() ~= "gk_roach" or not ply:Alive() then return end
+        if not IsValid(r) or r:GetClass() ~= "gk_roach" then return end
+        -- The same conditions the client checks before it sends: holding the mind
+        -- hands, and the catching hand is empty (no item, no fist up).
+        local wep = ply:GetActiveWeapon()
+        if not IsValid(wep) or wep:GetClass() ~= "gk_mind" then return end
+        if ply:GetNW2String("gk_hitem_" .. side, "") ~= "" or (GK.HasFist and GK.HasFist(ply, side)) then return end
         -- Loose checks: near enough (with lag slack) and roughly in front.
         local src = ply:GetShootPos()
         local reach = GK.GripRange(ply) + REACH_SLACK
