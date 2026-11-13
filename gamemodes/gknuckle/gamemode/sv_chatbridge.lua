@@ -88,7 +88,8 @@ local function cleanName(s)
     local n = clean(s, MAX_NAME)
     n = string.gsub(n, ":", " ")
     n = string.gsub(n, "\239\188\154", " ") -- U+FF1A fullwidth colon
-    n = string.Trim((string.gsub(n, "%s+", " ")))
+    local collapsed = string.gsub(n, "%s+", " ") -- one value: gsub's count must not reach Trim
+    n = string.Trim(collapsed)
     return n ~= "" and n or "player"
 end
 GKCommunity.CleanName = cleanName

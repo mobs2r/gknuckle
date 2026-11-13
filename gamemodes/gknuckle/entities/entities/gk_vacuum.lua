@@ -151,8 +151,7 @@ if CLIENT then
         -- lip light up one per player on the pad (the 13th would be vaporized);
         -- three lamps above show free arenas; the last 10 s the tube's rings
         -- light up from the bottom like a countdown.
-        local lipZ, tubeR = 280, 190                       -- hub-4: the pad's own tube mouth
-        local count, free = self:GetCount(), self:GetFreeArenas()
+        local count = self:GetCount()
         -- The hypervisor: queue text running around the dark band at hip height.
         if not self:GetHyper() then return end             -- hypervisor band: one pad draws it
         local hub = GK.HubLayout and GK.HubLayout() or nil

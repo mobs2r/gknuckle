@@ -37,7 +37,7 @@ check("key format", A.ParseKey("srv1:0123456789abcdef0123") == "srv1" and A.Pars
 local realTime = os.time
 os.time = function() return 1700000000 end
 A.Nonce = function() return "00112233445566778899aabbccddeeff" end
-local h = A.Headers("srv1:0123456789abcdef0123", "POST", "/api/x?y=1", '{"a":1}')
+local h = A.Headers("srv1:0123456789abcdef0123", "POST", "/api/x?y=1", "{\"a\":1}")
 os.time = realTime
 check("signature", h["X-GKnuckle-Signature"] == "cqPAttS5jHfHkbRuHn5LgecU272Dc8Eb9D3JNBpecD0" and h["X-GKnuckle-Key"] == "srv1")
 check("secret never in headers", not table.concat({ h["X-GKnuckle-Key"], h["X-GKnuckle-Signature"], h["X-GKnuckle-Nonce"] }):find("0123456789abcdef0123", 1, true))

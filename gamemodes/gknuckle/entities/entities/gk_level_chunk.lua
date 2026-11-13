@@ -97,7 +97,7 @@ function GK.LevelChunks(piece)
         end
         -- Pack the pieces of a split cell back into as few chunks as fit (first fit by
         -- size), so splitting does not multiply the entity count (edicts are capped at 2048).
-        local small, keys = {}, {}
+        local small = {}
         for key, cell in pairs(sub) do
             if #cell > MAX_CELL_TRIS * 3 and S > 128 then split(cell, S / 2, level + 1)
             elseif level == 0 then cells[key] = cell
@@ -114,9 +114,9 @@ function GK.LevelChunks(piece)
                 end
             end
             if not placed then
-                local list = {}
-                for _, vv in ipairs(it[2]) do list[#list + 1] = vv end
-                bins[#bins + 1] = { key = it[1], list = list }
+                local packed = {}
+                for _, vv in ipairs(it[2]) do packed[#packed + 1] = vv end
+                bins[#bins + 1] = { key = it[1], list = packed }
             end
         end
         for _, bin in ipairs(bins) do cells[bin.key] = bin.list end

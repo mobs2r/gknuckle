@@ -274,7 +274,8 @@ if CLIENT then
     net.Receive("gk_perk_offer", function()
         local cards = {}
         for i = 1, net.ReadUInt(3) do cards[i] = net.ReadString() end
-        local taken, price = net.ReadUInt(3), net.ReadUInt(8)
+        net.ReadUInt(3) -- cards already taken at this console (unused by the client)
+        local price = net.ReadUInt(8)
         if IsValid(frame) then frame:Remove() end
         if #cards == 0 then return end
         local h = ScrH() * 0.42

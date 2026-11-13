@@ -5,7 +5,6 @@
 -- Each item: name, model (world + held), weight, stack (max count), and
 -- server-side Use(ply, side, item) returning true if the item was used up.
 
-local C = GK.Config
 
 GK.Items = GK.Items or {}
 

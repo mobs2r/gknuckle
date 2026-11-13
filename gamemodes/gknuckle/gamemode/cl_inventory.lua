@@ -20,12 +20,6 @@ local function sendMove(id, target, x, y)
     net.SendToServer()
 end
 
-local function label(item)
-    local def = GK.ItemDef(item.class)
-    if not def then return item.class end
-    return def.Label and (def.name .. " " .. def.Label(item)) or def.name
-end
-
 -- WK shows items in the inventory as the same 2D sprites you hold them by:
 -- the item layer of each held layout (data_static/gknuckle/held.json).
 local spriteOf = {}

@@ -99,7 +99,7 @@ if SERVER then
 
     -- One blow against a player: damage through any block, and what happens.
     function M.Hit(attacker, victim, dmg, pos, dir, isKick)
-        local mult, strongGuard = M.BlockMult(victim, attacker:GetPos())
+        local mult = M.BlockMult(victim, attacker:GetPos())
         if mult < 1 then
             -- On the guard: nothing gets through, if they can pay for holding it.
             if M.Spend(victim, M.JumpCost()) then

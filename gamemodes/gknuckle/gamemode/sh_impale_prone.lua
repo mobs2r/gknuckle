@@ -9,7 +9,6 @@
 -- flesh chunks, crystal blood, a burn mark on the floor.
 AddCSLuaFile()
 
-local C = GK.Config
 
 function GK.ImpaleProne(ply) return GK.IsImpaled(ply) and ply:GetNW2Bool("gk_impale_prone", false) end
 

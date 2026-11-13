@@ -53,8 +53,8 @@ if SERVER then
 
     function ENT:OnRemove() if self.GK_Fly then self.GK_Fly:Stop() end end
 
-    local function trace(a, b, self)
-        return util.TraceLine({ start = a, endpos = b, mask = MASK_SOLID, filter = self })
+    local function trace(a, b, ignore)
+        return util.TraceLine({ start = a, endpos = b, mask = MASK_SOLID, filter = ignore })
     end
 
     -- A wander spot: a random direction 1-10 m off, pulled home when it strays,

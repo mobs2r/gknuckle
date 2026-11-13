@@ -161,7 +161,7 @@ if SERVER then
             end
             if not hand then return false end
             local class = kind == "platinum" and "roach_platinum" or "roach"
-            inv.slots[hand] = { id = (inv.nextId or 1), class = class, data = {} }
+            inv.slots[hand] = { id = inv.nextId or 1, class = class, data = {} }
             inv.nextId = (inv.nextId or 1) + 1
             GK.Inv.Sync(ply)
             return true
@@ -206,7 +206,7 @@ if SERVER then
 
     -- Keeps a few roaches alive around marked spots (hub: info_target
     -- "gk_roach_spot"); on sandbox maps, around the starter area.
-    local spots, nextFill = {}, 0
+    local spots = {}
     local function findSpots()
         spots = {}
         for _, t in ipairs(ents.FindByClass("info_target")) do

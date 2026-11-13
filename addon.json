@@ -8,6 +8,11 @@
 		"*.gma",
 		".git/*",
 		".gitignore",
-		"tools/*"
+		"tools/*",
+		".github/*",
+		".glualint.json",
+		"docs/*",
+		"tests/*",
+		"server.cfg.example"
 	]
 }
